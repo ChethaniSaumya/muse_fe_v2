@@ -32,10 +32,9 @@ const App = () => {
               <div className="min-h-screen flex flex-col">
                 <main className="flex-1">
                   <Routes>
-                    <Route path="/e" element={<Home />} />
+                    <Route path="/" element={<Home />} />
                     <Route path="/my-dashboard" element={<UserPanel />} />
-                    <Route path="/test-dashboard" element={<TestUserPanel />} />
-                    <Route path="/" element={<AdminPanel />} />  
+                    <Route path="/test-dashboard" element={<TestUserPanel />} /> 
                    </Routes>
                 </main>
               </div>
