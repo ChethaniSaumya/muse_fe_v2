@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(\\d+)",
+      "destination": "/api.html"
+    },
+    {
+      "source": "/api/(\\d+)/view",
+      "destination": "/api.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
