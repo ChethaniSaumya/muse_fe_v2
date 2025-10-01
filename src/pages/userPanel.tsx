@@ -1941,25 +1941,7 @@ const UserPanel = () => {
               <div className="stat-item">
                 <span className="stat-label">Equivalent in USD:</span>
                 <span className="stat-value">
-                  ${(() => {
-                    try {
-                      if (!disposalAmount || disposalAmount <= 0) {
-                        return '0.00';
-                      }
-
-                      const currentTotalSupply = Number(totalSupplyFromContract) || Number(totalSupply) || 1;
-                      const calculation = calculateDynamicPayout(
-                        userData?.totalMinted || 0,
-                        currentTotalSupply,
-                        disposalAmount,
-                        totalWithdrawn || 0
-                      );
-                      return (calculation?.availableAmount || 0).toFixed(2);
-                    } catch (error) {
-                      console.error('Error calculating USD equivalent:', error);
-                      return '0.00';
-                    }
-                  })()}
+                  $0
                 </span>
               </div>
               <div className="stat-item">
