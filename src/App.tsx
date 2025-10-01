@@ -35,8 +35,7 @@ const App = () => {
                     <Route path="/" element={<Home />} />
                     <Route path="/my-dashboard" element={<UserPanel />} />
                     <Route path="/test-dashboard" element={<TestUserPanel />} />
-                    <Route path="/admin-panel" element={<AdminPanel />} />             
-                  </Routes>
+                   </Routes>
                 </main>
               </div>
             </BrowserRouter>
