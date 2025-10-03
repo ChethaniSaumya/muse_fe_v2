@@ -140,6 +140,66 @@ const AdminPanel = () => {
 	const [showTaxIdRejectionModal, setShowTaxIdRejectionModal] = useState(false);
 	const [taxIdRejectionReason, setTaxIdRejectionReason] = useState('');
 	const [isVerifyingTaxId, setIsVerifyingTaxId] = useState(false);
+	const [artistProjects, setArtistProjects] = useState([]);
+	const [artistProjectsLoading, setArtistProjectsLoading] = useState(false);
+	const [artistProjectsFilter, setArtistProjectsFilter] = useState('all');
+	const [artistProjectsSearch, setArtistProjectsSearch] = useState('');
+	const [artistProjectsPage, setArtistProjectsPage] = useState(1);
+	const [artistProjectsStats, setArtistProjectsStats] = useState<ArtistProjectsStats>({});
+
+	interface ArtistProjectsStats {
+		total?: number;
+		pending?: number;
+		approved?: number;
+		rejected?: number;
+	}
+
+	const fetchArtistProjects = async (page = 1, status = 'all', search = '') => {
+		try {
+			setArtistProjectsLoading(true);
+
+			// Always send 'all' for the all filter, not empty string
+			const statusParam = status === 'all' ? 'all' : status;
+
+			const params = new URLSearchParams({
+				page: page.toString(),
+				limit: '10',
+				status: statusParam,
+				search: search
+			});
+
+			console.log('🔍 Fetching artist projects with params:', {
+				page,
+				status: statusParam,
+				search
+			});
+
+			const response = await fetch(`https://muse-be.onrender.com/api/admin/artist-projects?${params}`);
+
+			if (response.ok) {
+				const data = await response.json();
+				console.log('✅ Artist projects fetched successfully:', {
+					projectsCount: data.projects?.length,
+					stats: data.stats,
+					pagination: data.pagination
+				});
+
+				setArtistProjects(data.projects || []);
+				setArtistProjectsStats(data.stats || {});
+
+			} else {
+				console.error('❌ Failed to load artist projects:', response.status);
+				const errorText = await response.text();
+				console.error('❌ Error response:', errorText);
+				showNotification('Failed to load artist projects', 'error');
+			}
+		} catch (error) {
+			console.error('❌ Error fetching artist projects:', error);
+			showNotification('Error loading artist projects', 'error');
+		} finally {
+			setArtistProjectsLoading(false);
+		}
+	};
 
 	// Payout management states
 	const [payoutLimits, setPayoutLimits] = useState<PayoutLimits>({
@@ -1176,6 +1236,94 @@ const AdminPanel = () => {
 		}
 	};
 
+	const handleViewProject = (project) => {
+		// Show project details modal
+		console.log('View project:', project);
+	};
+
+	const handleProjectStatus = async (projectId, status) => {
+		try {
+			const response = await fetch(`https://muse-be.onrender.com/api/admin/artist-projects/${projectId}/status`, {
+				method: 'PUT',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ status })
+			});
+
+			if (response.ok) {
+				showNotification(`Project ${status} successfully`, 'success');
+				fetchArtistProjects(artistProjectsPage, artistProjectsFilter, artistProjectsSearch);
+			} else {
+				const errorData = await response.json();
+				showNotification(errorData.error || `Failed to ${status} project`, 'error');
+			}
+		} catch (error) {
+			console.error(`❌ Error ${status} project:`, error);
+			showNotification(`Failed to ${status} project`, 'error');
+		}
+	};
+
+	const handleRejectProject = async (project) => {
+		const rejectionReason = prompt('Please provide a reason for rejecting this project:');
+
+		if (rejectionReason === null) return; // User cancelled
+
+		if (!rejectionReason.trim()) {
+			showNotification('Please provide a rejection reason', 'error');
+			return;
+		}
+
+		try {
+			const response = await fetch(`https://muse-be.onrender.com/api/admin/artist-projects/${project.id}/status`, {
+				method: 'PUT',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					status: 'rejected',
+					rejectionReason: rejectionReason.trim()
+				})
+			});
+
+			if (response.ok) {
+				showNotification('Project rejected successfully', 'success');
+				fetchArtistProjects(artistProjectsPage, artistProjectsFilter, artistProjectsSearch);
+			} else {
+				const errorData = await response.json();
+				showNotification(errorData.error || 'Failed to reject project', 'error');
+			}
+		} catch (error) {
+			console.error('❌ Error rejecting project:', error);
+			showNotification('Failed to reject project', 'error');
+		}
+	};
+
+	const handleDeleteProject = async (projectId) => {
+		if (window.confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
+			try {
+				const response = await fetch(`https://muse-be.onrender.com/api/admin/artist-projects/${projectId}`, {
+					method: 'DELETE',
+					headers: {
+						'Content-Type': 'application/json',
+					}
+				});
+
+				if (response.ok) {
+					showNotification('Project deleted successfully', 'success');
+					// Refresh the projects list
+					fetchArtistProjects(artistProjectsPage, artistProjectsFilter, artistProjectsSearch);
+				} else {
+					const errorData = await response.json();
+					showNotification(errorData.error || 'Failed to delete project', 'error');
+				}
+			} catch (error) {
+				console.error('❌ Error deleting project:', error);
+				showNotification('Failed to delete project', 'error');
+			}
+		}
+	};
+
 	useEffect(() => {
 		if (address && isOwner) {
 			console.log('🚀 Initializing admin panel data...');
@@ -1198,6 +1346,13 @@ const AdminPanel = () => {
 			setTimeout(initializeData, 100);
 		}
 	}, [address, isOwner]);
+
+	useEffect(() => {
+		if (address && isOwner && activeTab === 'artists') {
+			// Fetch artist projects when the artists tab becomes active
+			fetchArtistProjects(1, artistProjectsFilter, artistProjectsSearch);
+		}
+	}, [activeTab, address, isOwner]);
 
 	useEffect(() => {
 		if (address && isOwner && currentPage > 0) {
@@ -1275,6 +1430,7 @@ const AdminPanel = () => {
 	// Tab configuration
 	const tabs = [
 		{ id: 'contract', label: 'Contract Settings', icon: '⚙️' },
+		{ id: 'artists', label: "Artist's Contracts", icon: '🎨' },
 		{ id: 'identity', label: 'Identity Documents', icon: '📄' },
 		{ id: 'taxid', label: 'Tax ID Documents', icon: '🧾' },
 		{ id: 'royalty', label: 'Royalty Management', icon: '💰' },
@@ -1573,6 +1729,264 @@ const AdminPanel = () => {
 					</div>
 				);
 
+			case 'artists':
+				return (
+					<div className="tab-content full-width">
+						<section className="admin-form-group full-width">
+							<h2 id="h2New">🎨 Artist's Contracts</h2>
+
+							{/* Statistics Dashboard */}
+							<div className="document-stats-dashboard">
+								<div className="stat-card total">
+									<div className="stat-number">{artistProjectsStats.total ?? 0}</div>
+									<div className="stat-label">Total Projects</div>
+								</div>
+								<div className="stat-card pending">
+									<div className="stat-number">{artistProjectsStats.pending ?? 0}</div>
+									<div className="stat-label">Pending Review</div>
+								</div>
+								<div className="stat-card approved">
+									<div className="stat-number">{artistProjectsStats.approved ?? 0}</div>
+									<div className="stat-label">Approved</div>
+								</div>
+								<div className="stat-card rejected">
+									<div className="stat-number">{artistProjectsStats.rejected ?? 0}</div>
+									<div className="stat-label">Rejected</div>
+								</div>
+							</div>
+
+							{/* Search and Filter Controls */}
+							<div className="document-controls">
+								<div className="search-section">
+									<label>Search Projects</label>
+									<div className="search-input-container">
+										<input
+											type="text"
+											placeholder="Search by project name, symbol, artist name..."
+											value={artistProjectsSearch}
+											onChange={(e) => setArtistProjectsSearch(e.target.value)}
+											className="search-input"
+										/>
+										<button
+											className="search-btn"
+											onClick={() => {
+												setArtistProjectsPage(1);
+												fetchArtistProjects(1, artistProjectsFilter, artistProjectsSearch);
+											}}
+										>
+											<i className="fas fa-search"></i>
+										</button>
+									</div>
+								</div>
+
+								<div className="filter-section">
+									<label>Filter by Status</label>
+									<div className="filter-buttons">
+										{['all', 'pending', 'approved', 'rejected'].map(status => (
+											<button
+												key={status}
+												className={`filter-btn ${artistProjectsFilter === status ? 'active' : ''}`}
+												onClick={() => {
+													setArtistProjectsFilter(status);
+													setArtistProjectsPage(1);
+													fetchArtistProjects(1, status, artistProjectsSearch);
+												}}
+											>
+												{status.charAt(0).toUpperCase() + status.slice(1)}
+												{artistProjectsStats[status as keyof ArtistProjectsStats] !== undefined &&
+													status !== 'all' && ` (${artistProjectsStats[status as keyof ArtistProjectsStats]})`
+												}
+											</button>
+										))}
+									</div>
+								</div>
+							</div>
+
+							{/* Projects Table */}
+							<div className="documents-table-container">
+								{artistProjectsLoading ? (
+									<div className="documents-loading">
+ 										<p>Loading artist projects...</p>
+									</div>
+								) : artistProjects.length === 0 ? (
+									<div className="no-documents">
+										<div className="no-documents-icon">🎨</div>
+										<h3>No Artist Projects Found</h3>
+										<p>No projects match your current filters</p>
+										<button
+											className="reload-btn"
+											onClick={() => {
+												setArtistProjectsFilter('all');
+												setArtistProjectsSearch('');
+												setArtistProjectsPage(1);
+												fetchArtistProjects(1, 'all', '');
+											}}
+										>
+											<i className="fas fa-sync-alt"></i> Reload All Projects
+										</button>
+									</div>
+								) : (
+									<>
+										<div className="documents-table artist-projects-table">
+											<div className="table-header">
+												<div className="table-cell">Project Image</div>
+												<div className="table-cell">Project Name</div>
+												<div className="table-cell">Symbol</div>
+												<div className="table-cell">Total Supply</div>
+												<div className="table-cell">Mint Price (POL)</div>
+												<div className="table-cell">Artist</div>
+ 											</div>
+
+											{artistProjects.map((project, index) => (
+												<div key={project.id || index} className="table-row">
+													{/* Project Image */}
+													<div className="table-cell" data-label="Project Image">
+														<div className="project-image-cell">
+															{project.imageIpfsUrl ? (
+																<img
+																	src={project.imageIpfsUrl}
+																	alt={project.projectName}
+																	className="project-thumbnail"
+																	onError={(e) => {
+																		const target = e.target as HTMLImageElement;
+																		target.style.display = 'none';
+																		target.nextElementSibling?.classList.remove('hidden');
+																	}}
+																/>
+															) : null}
+															<div className="no-image-placeholder hidden">
+																<i className="fas fa-image"></i>
+																<span>No Image</span>
+															</div>
+														</div>
+													</div>
+
+													{/* Project Name */}
+													<div className="table-cell" data-label="Project Name">
+														<div className="project-name-cell">
+															<strong>{project.projectName}</strong>
+														</div>
+													</div>
+
+													{/* Project Symbol */}
+													<div className="table-cell" data-label="Symbol">
+														<span className="project-symbol">{project.projectSymbol}</span>
+													</div>
+
+													{/* Total Supply */}
+													<div className="table-cell" data-label="Total Supply">
+														<span className="supply-cell">{project.totalSupply?.toLocaleString()}</span>
+													</div>
+
+													{/* Mint Price */}
+													<div className="table-cell" data-label="Mint Price">
+														<span className="price-cell">{project.mintPrice} POL</span>
+													</div>
+
+													{/* Artist Info */}
+													<div className="table-cell" data-label="Artist">
+														<div className="artist-info-cell">
+															<div className="artist-name">{project.artistName}</div>
+															<div className="artist-email">{project.artistEmail}</div>
+														</div>
+													</div>
+
+													{/* Status */}
+													<div className="table-cell" data-label="Status">
+														<span className={`status-badge ${project.status}`}>
+															{project.status?.charAt(0).toUpperCase() + project.status?.slice(1)}
+														</span>
+													</div>
+
+													{/* Actions */}
+													<div className="table-cell" data-label="Actions">
+														<div className="action-buttons">
+
+															{project.status === 'pending' && (
+																<>
+																	<button
+																		className="approve-btn-sm"
+																		onClick={() => handleProjectStatus(project.id, 'approved')}
+																		title="Approve Project"
+																	>
+																		<i className="fas fa-check"></i>
+																	</button>
+																	<button
+																		className="reject-btn-sm"
+																		onClick={() => handleRejectProject(project)}
+																		title="Reject Project"
+																	>
+																		<i className="fas fa-times"></i>
+																	</button>
+																</>
+															)}
+															{/*<button
+																className="delete-btn-sm"
+																onClick={() => handleDeleteProject(project.id)}
+																title="Delete Project"
+															>
+																<i className="fas fa-trash"></i>
+															</button>*/}
+														</div>
+													</div>
+												</div>
+											))}
+										</div>
+
+										{/* Pagination */}
+										{/* Pagination */}
+										<div className="pagination-container">
+											<div className="pagination-info">
+												Showing {((artistProjectsPage - 1) * 10) + 1} to {Math.min(artistProjectsPage * 10, artistProjectsStats.total || 0)} of {artistProjectsStats.total} projects
+											</div>
+
+											<div className="pagination-controls">
+												<button
+													className="pagination-btn"
+													onClick={() => {
+														setArtistProjectsPage(1);
+														fetchArtistProjects(1, artistProjectsFilter, artistProjectsSearch);
+													}}
+													disabled={artistProjectsPage === 1}
+												>
+													<i className="fas fa-angle-double-left"></i>
+												</button>
+
+												<button
+													className="pagination-btn"
+													onClick={() => {
+														const newPage = artistProjectsPage - 1;
+														setArtistProjectsPage(newPage);
+														fetchArtistProjects(newPage, artistProjectsFilter, artistProjectsSearch);
+													}}
+													disabled={artistProjectsPage === 1}
+												>
+													<i className="fas fa-angle-left"></i>
+												</button>
+
+												<span className="pagination-current">
+													Page {artistProjectsPage}
+												</span>
+
+												<button
+													className="pagination-btn"
+													onClick={() => {
+														const newPage = artistProjectsPage + 1;
+														setArtistProjectsPage(newPage);
+														fetchArtistProjects(newPage, artistProjectsFilter, artistProjectsSearch);
+													}}
+													disabled={artistProjects.length < 10}
+												>
+													<i className="fas fa-angle-right"></i>
+												</button>
+											</div>
+										</div>
+									</>
+								)}
+							</div>
+						</section>
+					</div>
+				);
 			case 'identity':
 				return (
 					<div className="tab-content full-width">
@@ -1634,7 +2048,7 @@ const AdminPanel = () => {
 												}}
 											>
 												{status.charAt(0).toUpperCase() + status.slice(1)}
-												{documentStats[status as keyof DocumentStats] !== undefined && ` (${documentStats[status as keyof DocumentStats]})`}
+												{artistProjectsStats[status as keyof ArtistProjectsStats] !== undefined && ` (${artistProjectsStats[status as keyof ArtistProjectsStats]})`}
 											</button>
 										))}
 									</div>
@@ -1807,21 +2221,22 @@ const AdminPanel = () => {
 							<h2 id="h2New">🧾 Tax ID Document Management</h2>
 
 							{/* Statistics Dashboard */}
+							{/* Statistics Dashboard */}
 							<div className="document-stats-dashboard">
 								<div className="stat-card total">
-									<div className="stat-number">{taxIdStats.total || 0}</div>
-									<div className="stat-label">Total Tax Documents</div>
+									<div className="stat-number">{artistProjectsStats.total ?? 0}</div>
+									<div className="stat-label">Total Projects</div>
 								</div>
 								<div className="stat-card pending">
-									<div className="stat-number">{taxIdStats.pending || 0}</div>
+									<div className="stat-number">{artistProjectsStats.pending ?? 0}</div>
 									<div className="stat-label">Pending Review</div>
 								</div>
 								<div className="stat-card approved">
-									<div className="stat-number">{taxIdStats.approved || 0}</div>
+									<div className="stat-number">{artistProjectsStats.approved ?? 0}</div>
 									<div className="stat-label">Approved</div>
 								</div>
 								<div className="stat-card rejected">
-									<div className="stat-number">{taxIdStats.rejected || 0}</div>
+									<div className="stat-number">{artistProjectsStats.rejected ?? 0}</div>
 									<div className="stat-label">Rejected</div>
 								</div>
 							</div>
