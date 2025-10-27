@@ -868,14 +868,26 @@ const TestUserPanel = () => {
     );
 
     const availableAmount = calculation?.availableAmount || 0;
-    const maxWithdrawal = Math.floor((availableAmount - 0.10) * 100) / 100;
+    const maxWithdrawal = availableAmount - 0.10; // Don't floor it yet
 
-    if (amount > maxWithdrawal + 0.01) {
+    console.log('🔍 VALIDATE AMOUNT DEBUG:', {
+      inputAmount: amount,
+      availableAmount,
+      maxWithdrawal,
+      totalWithdrawn
+    });
+
+    if (amount > maxWithdrawal && Math.abs(amount - maxWithdrawal) > 0.01) {
       setAmountError(`Maximum withdrawal is $${maxWithdrawal.toFixed(2)}`);
     } else if (amount < 0.10) {
       setAmountError('Minimum withdrawal is $0.10');
     } else {
-      setAmountError(null);
+      const remainingBalance = Number((availableAmount - amount).toFixed(2));
+      if (remainingBalance > 0 && remainingBalance < 0.10) {
+        setAmountError(`This would leave $${remainingBalance.toFixed(2)} in your account. Please withdraw the full amount or leave at least $0.10`);
+      } else {
+        setAmountError(null);
+      }
     }
   };
 
@@ -2410,21 +2422,16 @@ const TestUserPanel = () => {
                         type="number"
                         step="0.01"
                         min="0.10"
-                        max={(() => {
-                          const calculation = calculateDynamicPayout(
-                            userData?.totalMinted || 0,
-                            Number(totalSupplyFromContract) || Number(totalSupply) || 1,
-                            disposalAmount || 0,
-                            totalWithdrawn || 0
-                          );
-                          const availableAmount = calculation?.availableAmount || 0;
-                          return Math.max(0, availableAmount - 0.10);
-                        })()}
                         placeholder="0.00"
                         value={withdrawalAmount}
                         onChange={(e) => {
-                          setWithdrawalAmount(e.target.value);
-                          validateAmount(e.target.value);
+                          const newValue = e.target.value;
+                          setWithdrawalAmount(newValue);
+                          if (newValue) {
+                            validateAmount(newValue);
+                          } else {
+                            setAmountError(null);
+                          }
                           if (paypalUpdateMessage && (paypalUpdateMessage.type === 'error' || paypalUpdateMessage.type === 'warning')) {
                             setPaypalUpdateMessage(null);
                           }
@@ -2458,7 +2465,8 @@ const TestUserPanel = () => {
                           totalWithdrawn || 0
                         );
                         const availableAmount = calc?.availableAmount || 0;
-                        return Math.max(0, availableAmount - 0.10).toFixed(2);
+                        const maxAmount = availableAmount - 0.10;
+                        return Math.max(0, maxAmount).toFixed(2);
                       })()}</span>
                     </div>
                   </div>
@@ -2484,8 +2492,9 @@ const TestUserPanel = () => {
                             setting: maxWithdrawAmount.toFixed(2)
                           });
 
-                          setWithdrawalAmount(maxWithdrawAmount.toFixed(2));
-                          validateAmount(maxWithdrawAmount.toFixed(2));
+                          const finalAmount = maxWithdrawAmount.toFixed(2);
+                          setWithdrawalAmount(finalAmount);
+                          setAmountError(null); // Clear error when using Max button
                         }}
                         disabled={
                           isRequestingPayout ||
@@ -2499,7 +2508,7 @@ const TestUserPanel = () => {
                               disposalAmount || 0,
                               totalWithdrawn || 0
                             );
-                            return (calc?.availableAmount || 0) < 0.20; // At least $0.10 + $0.10 reserve
+                            return (calc?.availableAmount || 0) < 0.20;
                           })()
                         }
                       >
