@@ -732,7 +732,7 @@ const TestUserPanel = () => {
       }
 
       const remainingBalance = Number((availableAmount - requestedAmount).toFixed(2));
-      if (remainingBalance > 0 && remainingBalance < 0.10) {
+      if (remainingBalance > 0.001 && remainingBalance < 0.10) {
         setPaypalUpdateMessage({
           text: `This would leave $${remainingBalance.toFixed(2)} in your account. Please withdraw the full amount or leave at least $0.10`,
           type: 'error'
@@ -883,7 +883,7 @@ const TestUserPanel = () => {
       setAmountError('Minimum withdrawal is $0.10');
     } else {
       const remainingBalance = Number((availableAmount - amount).toFixed(2));
-      if (remainingBalance > 0 && remainingBalance < 0.10) {
+      if (remainingBalance > 0.001 && remainingBalance < 0.10) {
         setAmountError(`This would leave $${remainingBalance.toFixed(2)} in your account. Please withdraw the full amount or leave at least $0.10`);
       } else {
         setAmountError(null);
