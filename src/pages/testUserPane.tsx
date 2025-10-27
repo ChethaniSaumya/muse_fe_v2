@@ -713,9 +713,10 @@ const TestUserPanel = () => {
       );
 
       const availableAmount = calculation?.availableAmount || 0;
-      const maxWithdrawal = availableAmount - 0.10;
+      // FIXED: No reserve needed - can withdraw full amount
+      const maxWithdrawal = availableAmount;
 
-      if (requestedAmount > maxWithdrawal && Math.abs(requestedAmount - maxWithdrawal) > 0.001) {
+      if (requestedAmount > maxWithdrawal && Math.abs(requestedAmount - maxWithdrawal) > 0.01) {
         setPaypalUpdateMessage({
           text: `Amount exceeds maximum withdrawal of $${maxWithdrawal.toFixed(2)}`,
           type: 'error'
@@ -731,14 +732,7 @@ const TestUserPanel = () => {
         return;
       }
 
-      const remainingBalance = Number((availableAmount - requestedAmount).toFixed(2));
-      if (remainingBalance > 0.001 && remainingBalance < 0.10) {
-        setPaypalUpdateMessage({
-          text: `This would leave $${remainingBalance.toFixed(2)} in your account. Please withdraw the full amount or leave at least $0.10`,
-          type: 'error'
-        });
-        return;
-      }
+      // REMOVED: No remaining balance check - can withdraw full amount
 
       if (!paypalEmail) {
         setPaypalUpdateMessage({
@@ -868,7 +862,8 @@ const TestUserPanel = () => {
     );
 
     const availableAmount = calculation?.availableAmount || 0;
-    const maxWithdrawal = availableAmount - 0.10; // Don't floor it yet
+    // FIXED: No reserve needed - can withdraw full amount
+    const maxWithdrawal = availableAmount;
 
     console.log('🔍 VALIDATE AMOUNT DEBUG:', {
       inputAmount: amount,
@@ -882,14 +877,10 @@ const TestUserPanel = () => {
     } else if (amount < 0.10) {
       setAmountError('Minimum withdrawal is $0.10');
     } else {
-      const remainingBalance = Number((availableAmount - amount).toFixed(2));
-      if (remainingBalance > 0.001 && remainingBalance < 0.10) {
-        setAmountError(`This would leave $${remainingBalance.toFixed(2)} in your account. Please withdraw the full amount or leave at least $0.10`);
-      } else {
-        setAmountError(null);
-      }
+      setAmountError(null);
     }
   };
+
 
   const { data: totalSupplyFromContract } = useReadContract({
     address: contract.address as `0x${string}`,
@@ -2465,7 +2456,8 @@ const TestUserPanel = () => {
                           totalWithdrawn || 0
                         );
                         const availableAmount = calc?.availableAmount || 0;
-                        const maxAmount = availableAmount - 0.10;
+                        // CHANGED: No reserve - can withdraw full amount
+                        const maxAmount = availableAmount;
                         return Math.max(0, maxAmount).toFixed(2);
                       })()}</span>
                     </div>
@@ -2484,7 +2476,8 @@ const TestUserPanel = () => {
                             totalWithdrawn || 0
                           );
                           const availableAmount = calc?.availableAmount || 0;
-                          const maxWithdrawAmount = availableAmount - 0.10;
+                          // CHANGED: No reserve - withdraw full amount
+                          const maxWithdrawAmount = availableAmount;
 
                           console.log('🔍 DEBUG Max button:', {
                             availableAmount,
@@ -2494,7 +2487,7 @@ const TestUserPanel = () => {
 
                           const finalAmount = maxWithdrawAmount.toFixed(2);
                           setWithdrawalAmount(finalAmount);
-                          setAmountError(null); // Clear error when using Max button
+                          setAmountError(null);
                         }}
                         disabled={
                           isRequestingPayout ||
@@ -2508,7 +2501,8 @@ const TestUserPanel = () => {
                               disposalAmount || 0,
                               totalWithdrawn || 0
                             );
-                            return (calc?.availableAmount || 0) < 0.20;
+                            // CHANGED: Disable if less than $0.10 available
+                            return (calc?.availableAmount || 0) < 0.10;
                           })()
                         }
                       >
@@ -2540,21 +2534,12 @@ const TestUserPanel = () => {
                           disposalAmount || 0,
                           totalWithdrawn || 0
                         );
+                        // CHANGED: Disable if less than $0.10 available
                         return (calculation?.availableAmount || 0) < 0.10;
                       })()
                     }
                   >
-                    {isRequestingPayout ? (
-                      <>
-                        <i className="fas fa-spinner fa-spin"></i>
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <i className="fas fa-paper-plane"></i>
-                        Send to PayPal
-                      </>
-                    )}
+                    {isRequestingPayout ? 'Processing...' : 'Send to PayPal'}
                   </button>
                 </div>
               </div>
