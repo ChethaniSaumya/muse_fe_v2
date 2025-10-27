@@ -713,7 +713,7 @@ const TestUserPanel = () => {
       );
 
       const availableAmount = calculation?.availableAmount || 0;
-      const maxWithdrawal = availableAmount - 1.00;
+      const maxWithdrawal = availableAmount - 0.10;
 
       if (requestedAmount > maxWithdrawal && Math.abs(requestedAmount - maxWithdrawal) > 0.001) {
         setPaypalUpdateMessage({
@@ -723,18 +723,18 @@ const TestUserPanel = () => {
         return;
       }
 
-      if (requestedAmount < 1.00) {
+      if (requestedAmount < 0.10) {
         setPaypalUpdateMessage({
-          text: 'Minimum withdrawal amount is $1.00',
+          text: 'Minimum withdrawal amount is $0.10',
           type: 'error'
         });
         return;
       }
 
       const remainingBalance = Number((availableAmount - requestedAmount).toFixed(2));
-      if (remainingBalance > 0 && remainingBalance < 1.00) {
+      if (remainingBalance > 0 && remainingBalance < 0.10) {
         setPaypalUpdateMessage({
-          text: `This would leave $${remainingBalance.toFixed(2)} in your account. Please withdraw the full amount or leave at least $1.00`,
+          text: `This would leave $${remainingBalance.toFixed(2)} in your account. Please withdraw the full amount or leave at least $0.10`,
           type: 'error'
         });
         return;
