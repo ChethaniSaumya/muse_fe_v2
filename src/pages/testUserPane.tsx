@@ -2437,21 +2437,9 @@ const TestUserPanel = () => {
                         className="amount-input"
                         disabled={
                           !paypalEmail ||
-                          !userData?.totalMinted ||
-                          isRequestingPayout ||
-                          hasWithdrawnToday ||
                           !identityDocument?.verified ||
                           !taxIdDocument?.verified ||
-                          hasPendingPayout ||
-                          (() => {
-                            const calc = calculateDynamicPayout(
-                              userData?.totalMinted || 0,
-                              Number(totalSupplyFromContract) || Number(totalSupply) || 1,
-                              disposalAmount || 0,
-                              totalWithdrawn || 0
-                            );
-                            return (calc?.availableAmount || 0) < 2.00;
-                          })()
+                          isRequestingPayout
                         }
                       />
                     </div>
@@ -2497,10 +2485,13 @@ const TestUserPanel = () => {
                           });
 
                           setWithdrawalAmount(maxWithdrawAmount.toFixed(2));
+                          validateAmount(maxWithdrawAmount.toFixed(2));
                         }}
                         disabled={
-                          isRequestingPayout || !paypalEmail ||
-                          !identityDocument?.verified || !taxIdDocument?.verified ||
+                          isRequestingPayout ||
+                          !paypalEmail ||
+                          !identityDocument?.verified ||
+                          !taxIdDocument?.verified ||
                           (() => {
                             const calc = calculateDynamicPayout(
                               userData?.totalMinted || 0,
@@ -2508,7 +2499,7 @@ const TestUserPanel = () => {
                               disposalAmount || 0,
                               totalWithdrawn || 0
                             );
-                            return (calc?.availableAmount || 0) < 1.00;
+                            return (calc?.availableAmount || 0) < 2.00;
                           })()
                         }
                       >
@@ -2531,6 +2522,7 @@ const TestUserPanel = () => {
                       hasPendingPayout ||
                       !withdrawalAmount ||
                       parseFloat(withdrawalAmount) < 1.00 ||
+                      !!amountError ||
                       (() => {
                         const currentTotalSupply = Number(totalSupplyFromContract) || Number(totalSupply) || 1;
                         const calculation = calculateDynamicPayout(
