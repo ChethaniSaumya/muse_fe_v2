@@ -212,7 +212,6 @@ const UserPanel = () => {
   const [showDownloadSuccess, setShowDownloadSuccess] = useState(false);
   const [downloadedFileName, setDownloadedFileName] = useState('');
   const [paypalData, setPaypalData] = useState<PayPalData | null>(null);
-  const [cumulativeData, setCumulativeData] = useState<any>(null);
 
   const [identityDocument, setIdentityDocument] = useState<IdentityDocument | null>(null);
   const [isUploadingIdentity, setIsUploadingIdentity] = useState(false);
@@ -714,10 +713,9 @@ const UserPanel = () => {
       );
 
       const availableAmount = calculation?.availableAmount || 0;
-      // FIXED: No reserve needed - can withdraw full amount
-      const maxWithdrawal = availableAmount;
+      const maxWithdrawal = availableAmount - 1.00;
 
-      if (requestedAmount > maxWithdrawal && Math.abs(requestedAmount - maxWithdrawal) > 0.01) {
+      if (requestedAmount > maxWithdrawal && Math.abs(requestedAmount - maxWithdrawal) > 0.001) {
         setPaypalUpdateMessage({
           text: `Amount exceeds maximum withdrawal of $${maxWithdrawal.toFixed(2)}`,
           type: 'error'
@@ -725,15 +723,22 @@ const UserPanel = () => {
         return;
       }
 
-      if (requestedAmount < 0.10) {
+      if (requestedAmount < 1.00) {
         setPaypalUpdateMessage({
-          text: 'Minimum withdrawal amount is $0.10',
+          text: 'Minimum withdrawal amount is $1.00',
           type: 'error'
         });
         return;
       }
 
-      // REMOVED: No remaining balance check - can withdraw full amount
+      const remainingBalance = Number((availableAmount - requestedAmount).toFixed(2));
+      if (remainingBalance > 0 && remainingBalance < 1.00) {
+        setPaypalUpdateMessage({
+          text: `This would leave $${remainingBalance.toFixed(2)} in your account. Please withdraw the full amount or leave at least $1.00`,
+          type: 'error'
+        });
+        return;
+      }
 
       if (!paypalEmail) {
         setPaypalUpdateMessage({
@@ -808,7 +813,6 @@ const UserPanel = () => {
 
         setWithdrawalAmount('');
 
-        await fetchCumulativeBalance();
         await fetchPayPalData();
         await fetchUserData();
         await fetchCurrentDisposalAmount();
@@ -855,41 +859,25 @@ const UserPanel = () => {
       return;
     }
 
-    // Use cumulative data if available
-    let availableAmount = 0;
+    const currentTotalSupply = Number(totalSupplyFromContract) || Number(totalSupply) || 1;
+    const calculation = calculateDynamicPayout(
+      userData?.totalMinted || 0,
+      currentTotalSupply,
+      disposalAmount || 0,
+      totalWithdrawn || 0
+    );
 
-    if (cumulativeData && cumulativeData.success) {
-      availableAmount = cumulativeData.cumulativeAvailable || 0;
-    } else {
-      // Fallback to old calculation
-      const currentTotalSupply = Number(totalSupplyFromContract) || Number(totalSupply) || 1;
-      const calculation = calculateDynamicPayout(
-        userData?.totalMinted || 0,
-        currentTotalSupply,
-        disposalAmount || 0,
-        totalWithdrawn || 0
-      );
-      availableAmount = calculation?.availableAmount || 0;
-    }
+    const availableAmount = calculation?.availableAmount || 0;
+    const maxWithdrawal = Math.floor((availableAmount - 1.00) * 100) / 100;
 
-    const maxWithdrawal = availableAmount;
-
-    console.log('🔍 VALIDATE AMOUNT DEBUG:', {
-      inputAmount: amount,
-      availableAmount,
-      maxWithdrawal,
-      usingCumulativeData: !!(cumulativeData && cumulativeData.success)
-    });
-
-    if (amount > maxWithdrawal && Math.abs(amount - maxWithdrawal) > 0.01) {
+    if (amount > maxWithdrawal + 0.01) {
       setAmountError(`Maximum withdrawal is $${maxWithdrawal.toFixed(2)}`);
-    } else if (amount < 0.10) {
-      setAmountError('Minimum withdrawal is $0.10');
+    } else if (amount < 1.00) {
+      setAmountError('Minimum withdrawal is $1.00');
     } else {
       setAmountError(null);
     }
   };
-
 
   const { data: totalSupplyFromContract } = useReadContract({
     address: contract.address as `0x${string}`,
@@ -1318,30 +1306,6 @@ const UserPanel = () => {
 
   const [totalWithdrawn, setTotalWithdrawn] = useState(0);
 
-  const fetchCumulativeBalance = async () => {
-    try {
-      if (!walletAddress) return;
-
-      console.log('📊 Fetching cumulative balance for:', walletAddress);
-
-      const response = await fetch(
-        `${API_BASE_URL}/api/paypal/${walletAddress}/cumulative-breakdown`
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ Cumulative data received:', data);
-        setCumulativeData(data);
-      } else {
-        console.error('Failed to fetch cumulative data');
-        setCumulativeData(null);
-      }
-    } catch (error) {
-      console.error('Error fetching cumulative balance:', error);
-      setCumulativeData(null);
-    }
-  };
-
   useEffect(() => {
     if (walletAddress) {
       fetchUserData();
@@ -1349,7 +1313,6 @@ const UserPanel = () => {
       fetchIdentityStatus();
       fetchTaxIdStatus();
       fetchCurrentDisposalAmount();
-      fetchCumulativeBalance();
     }
   }, [walletAddress]);
 
@@ -1978,29 +1941,7 @@ const UserPanel = () => {
               <div className="stat-item">
                 <span className="stat-label">Equivalent in USD:</span>
                 <span className="stat-value">
-                  ${(() => {
-                    try {
-                      // Use cumulative data from backend
-                      if (cumulativeData && cumulativeData.success) {
-                        return cumulativeData.cumulativeAvailable.toFixed(2);
-                      }
-                      // Fallback
-                      if (!disposalAmount || disposalAmount <= 0) {
-                        return '0.00';
-                      }
-                      const currentTotalSupply = Number(totalSupplyFromContract) || Number(totalSupply) || 1;
-                      const calculation = calculateDynamicPayout(
-                        userData?.totalMinted || 0,
-                        currentTotalSupply,
-                        disposalAmount || 0,
-                        totalWithdrawn || 0
-                      );
-                      return (calculation?.availableAmount || 0).toFixed(2);
-                    } catch (error) {
-                      console.error('Error displaying USD equivalent:', error);
-                      return '0.00';
-                    }
-                  })()}
+                  $0
                 </span>
               </div>
               <div className="stat-item">
@@ -2357,14 +2298,9 @@ const UserPanel = () => {
                             </div>
                           </div>
                           <div className="table-cell" >{userData?.totalMinted || 0}</div>
-                          <div className="table-cell balance-amount">
+                          <div className="table-cell balance-amount" >
                             ${(() => {
                               try {
-                                // Use cumulative data from backend
-                                if (cumulativeData && cumulativeData.success) {
-                                  return cumulativeData.cumulativeAvailable.toFixed(2);
-                                }
-                                // Fallback to old calculation if cumulative data not loaded yet
                                 const currentTotalSupply = Number(totalSupplyFromContract) || Number(totalSupply) || 1;
                                 const calculation = calculateDynamicPayout(
                                   userData?.totalMinted || 0,
@@ -2374,7 +2310,7 @@ const UserPanel = () => {
                                 );
                                 return (calculation?.availableAmount || 0).toFixed(2);
                               } catch (error) {
-                                console.error('Error displaying balance:', error);
+                                console.error('Error calculating payout amount:', error);
                                 return '0.00';
                               }
                             })()}
@@ -2455,17 +2391,22 @@ const UserPanel = () => {
                         id="withdrawalAmount"
                         type="number"
                         step="0.01"
-                        min="0.10"
+                        min="1.00"
+                        max={(() => {
+                          const calculation = calculateDynamicPayout(
+                            userData?.totalMinted || 0,
+                            Number(totalSupplyFromContract) || Number(totalSupply) || 1,
+                            disposalAmount || 0,
+                            totalWithdrawn || 0
+                          );
+                          const availableAmount = calculation?.availableAmount || 0;
+                          return Math.max(0, availableAmount - 1.00);
+                        })()}
                         placeholder="0.00"
                         value={withdrawalAmount}
                         onChange={(e) => {
-                          const newValue = e.target.value;
-                          setWithdrawalAmount(newValue);
-                          if (newValue) {
-                            validateAmount(newValue);
-                          } else {
-                            setAmountError(null);
-                          }
+                          setWithdrawalAmount(e.target.value);
+                          validateAmount(e.target.value);
                           if (paypalUpdateMessage && (paypalUpdateMessage.type === 'error' || paypalUpdateMessage.type === 'warning')) {
                             setPaypalUpdateMessage(null);
                           }
@@ -2478,9 +2419,21 @@ const UserPanel = () => {
                         className="amount-input"
                         disabled={
                           !paypalEmail ||
+                          !userData?.totalMinted ||
+                          isRequestingPayout ||
+                          hasWithdrawnToday ||
                           !identityDocument?.verified ||
                           !taxIdDocument?.verified ||
-                          isRequestingPayout
+                          hasPendingPayout ||
+                          (() => {
+                            const calc = calculateDynamicPayout(
+                              userData?.totalMinted || 0,
+                              Number(totalSupplyFromContract) || Number(totalSupply) || 1,
+                              disposalAmount || 0,
+                              totalWithdrawn || 0
+                            );
+                            return (calc?.availableAmount || 0) < 2.00;
+                          })()
                         }
                       />
                     </div>
@@ -2490,7 +2443,7 @@ const UserPanel = () => {
                       </div>
                     )}
                     <div className="amount-limits">
-                      <span>Minimum: $0.10</span>
+                      <span>Minimum: $1.00</span>
                       <span>Maximum: ${(() => {
                         const calc = calculateDynamicPayout(
                           userData?.totalMinted || 0,
@@ -2499,9 +2452,7 @@ const UserPanel = () => {
                           totalWithdrawn || 0
                         );
                         const availableAmount = calc?.availableAmount || 0;
-                        // CHANGED: No reserve - can withdraw full amount
-                        const maxAmount = availableAmount;
-                        return Math.max(0, maxAmount).toFixed(2);
+                        return Math.max(0, availableAmount - 1.00).toFixed(2);
                       })()}</span>
                     </div>
                   </div>
@@ -2512,57 +2463,39 @@ const UserPanel = () => {
                       <button
                         className="quick-amount-btn"
                         onClick={() => {
-                          // Use cumulative data
-                          let maxAmount = 0;
+                          const calc = calculateDynamicPayout(
+                            userData?.totalMinted || 0,
+                            Number(totalSupplyFromContract) || Number(totalSupply) || 1,
+                            disposalAmount || 0,
+                            totalWithdrawn || 0
+                          );
+                          const availableAmount = calc?.availableAmount || 0;
+                          const maxWithdrawAmount = availableAmount - 1.00;
 
-                          if (cumulativeData && cumulativeData.success) {
-                            maxAmount = cumulativeData.cumulativeAvailable || 0;
-                          } else {
-                            // Fallback to old calculation
+                          console.log('🔍 DEBUG Max button:', {
+                            availableAmount,
+                            maxWithdrawAmount,
+                            setting: maxWithdrawAmount.toFixed(2)
+                          });
+
+                          setWithdrawalAmount(maxWithdrawAmount.toFixed(2));
+                        }}
+                        disabled={
+                          isRequestingPayout || !paypalEmail ||
+                          !identityDocument?.verified || !taxIdDocument?.verified ||
+                          (() => {
                             const calc = calculateDynamicPayout(
                               userData?.totalMinted || 0,
                               Number(totalSupplyFromContract) || Number(totalSupply) || 1,
                               disposalAmount || 0,
                               totalWithdrawn || 0
                             );
-                            maxAmount = calc?.availableAmount || 0;
-                          }
-
-                          console.log('🔍 DEBUG Max button:', {
-                            maxAmount,
-                            setting: maxAmount.toFixed(2),
-                            usingCumulativeData: !!(cumulativeData && cumulativeData.success)
-                          });
-
-                          const finalAmount = maxAmount.toFixed(2);
-                          setWithdrawalAmount(finalAmount);
-                          setAmountError(null);
-                        }}
-                        disabled={
-                          isRequestingPayout ||
-                          (cumulativeData ? cumulativeData.cumulativeAvailable <= 0 :
-                            (!disposalAmount || disposalAmount <= 0))
+                            return (calc?.availableAmount || 0) < 1.00;
+                          })()
                         }
                       >
                         Max
                       </button>
-
-                      {cumulativeData && cumulativeData.success && (
-                        <div style={{
-                          padding: '10px',
-                          background: '#f0f0f0',
-                          border: '1px solid #ccc',
-                          marginTop: '10px',
-                          fontSize: '12px'
-                        }}>
-                          <strong>Debug - Cumulative Data:</strong><br />
-                          Available: ${cumulativeData.cumulativeAvailable.toFixed(2)}<br />
-                          Total Eligible: ${cumulativeData.totalEligible.toFixed(2)}<br />
-                          Total Withdrawn: ${cumulativeData.totalWithdrawn.toFixed(2)}<br />
-                          Disbursements: {cumulativeData.totalDisbursements}
-                        </div>
-                      )}
-
                     </div>
                   </div>
 
@@ -2579,8 +2512,7 @@ const UserPanel = () => {
                       !taxIdDocument?.verified ||
                       hasPendingPayout ||
                       !withdrawalAmount ||
-                      parseFloat(withdrawalAmount) < 0.10 ||
-                      !!amountError ||
+                      parseFloat(withdrawalAmount) < 1.00 ||
                       (() => {
                         const currentTotalSupply = Number(totalSupplyFromContract) || Number(totalSupply) || 1;
                         const calculation = calculateDynamicPayout(
@@ -2589,12 +2521,21 @@ const UserPanel = () => {
                           disposalAmount || 0,
                           totalWithdrawn || 0
                         );
-                        // CHANGED: Disable if less than $0.10 available
-                        return (calculation?.availableAmount || 0) < 0.10;
+                        return (calculation?.availableAmount || 0) < 1.00;
                       })()
                     }
                   >
-                    {isRequestingPayout ? 'Processing...' : 'Send to PayPal'}
+                    {isRequestingPayout ? (
+                      <>
+                        <i className="fas fa-spinner fa-spin"></i>
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-paper-plane"></i>
+                        Send to PayPal
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
