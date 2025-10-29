@@ -717,17 +717,19 @@ const TestUserPanel = () => {
       // FIXED: No reserve needed - can withdraw full amount
       const maxWithdrawal = availableAmount;
 
-      if (requestedAmount > maxWithdrawal && Math.abs(requestedAmount - maxWithdrawal) > 0.01) {
+      const availableForWithdrawal = cumulativeData?.cumulativeAvailable || maxWithdrawal;
+
+      if (requestedAmount > availableForWithdrawal) {
         setPaypalUpdateMessage({
-          text: `Amount exceeds maximum withdrawal of $${maxWithdrawal.toFixed(2)}`,
+          text: `Amount exceeds available balance of $${availableForWithdrawal.toFixed(2)}`,
           type: 'error'
         });
         return;
       }
 
-      if (requestedAmount < 0.10) {
+      if (requestedAmount <= 0) {
         setPaypalUpdateMessage({
-          text: 'Minimum withdrawal amount is $0.10',
+          text: 'Please enter a valid withdrawal amount greater than $0',
           type: 'error'
         });
         return;
@@ -861,7 +863,6 @@ const TestUserPanel = () => {
     if (cumulativeData && cumulativeData.success) {
       availableAmount = cumulativeData.cumulativeAvailable || 0;
     } else {
-      // Fallback to old calculation
       const currentTotalSupply = Number(totalSupplyFromContract) || Number(totalSupply) || 1;
       const calculation = calculateDynamicPayout(
         userData?.totalMinted || 0,
@@ -872,19 +873,19 @@ const TestUserPanel = () => {
       availableAmount = calculation?.availableAmount || 0;
     }
 
-    const maxWithdrawal = availableAmount;
-
-    console.log('🔍 VALIDATE AMOUNT DEBUG:', {
+    console.log('🔍 VALIDATE AMOUNT:', {
       inputAmount: amount,
       availableAmount,
-      maxWithdrawal,
       usingCumulativeData: !!(cumulativeData && cumulativeData.success)
     });
 
-    if (amount > maxWithdrawal && Math.abs(amount - maxWithdrawal) > 0.01) {
-      setAmountError(`Maximum withdrawal is $${maxWithdrawal.toFixed(2)}`);
-    } else if (amount < 0.10) {
-      setAmountError('Minimum withdrawal is $0.10');
+    // REMOVED: All limit checks!
+    // Users can withdraw any amount from $0.01 to their full balance
+
+    if (amount <= 0) {
+      setAmountError('Amount must be greater than $0');
+    } else if (amount > availableAmount) {
+      setAmountError(`Amount exceeds available balance of $${availableAmount.toFixed(2)}`);
     } else {
       setAmountError(null);
     }
@@ -2490,18 +2491,17 @@ const TestUserPanel = () => {
                       </div>
                     )}
                     <div className="amount-limits">
-                      <span>Minimum: $0.10</span>
-                      <span>Maximum: ${(() => {
+                      <span>Available: ${(() => {
+                        if (cumulativeData && cumulativeData.success) {
+                          return cumulativeData.cumulativeAvailable.toFixed(2);
+                        }
                         const calc = calculateDynamicPayout(
                           userData?.totalMinted || 0,
                           Number(totalSupplyFromContract) || Number(totalSupply) || 1,
                           disposalAmount || 0,
                           totalWithdrawn || 0
                         );
-                        const availableAmount = calc?.availableAmount || 0;
-                        // CHANGED: No reserve - can withdraw full amount
-                        const maxAmount = availableAmount;
-                        return Math.max(0, maxAmount).toFixed(2);
+                        return (calc?.availableAmount || 0).toFixed(2);
                       })()}</span>
                     </div>
                   </div>
@@ -2563,18 +2563,20 @@ const TestUserPanel = () => {
                       !taxIdDocument?.verified ||
                       hasPendingPayout ||
                       !withdrawalAmount ||
-                      parseFloat(withdrawalAmount) < 0.10 ||
+                      parseFloat(withdrawalAmount) <= 0 ||  // Only check > 0
                       !!amountError ||
                       (() => {
-                        const currentTotalSupply = Number(totalSupplyFromContract) || Number(totalSupply) || 1;
+                        // Check if user has any available balance
+                        if (cumulativeData && cumulativeData.success) {
+                          return cumulativeData.cumulativeAvailable <= 0;
+                        }
                         const calculation = calculateDynamicPayout(
                           userData?.totalMinted || 0,
-                          currentTotalSupply,
+                          Number(totalSupplyFromContract) || Number(totalSupply) || 1,
                           disposalAmount || 0,
                           totalWithdrawn || 0
                         );
-                        // CHANGED: Disable if less than $0.10 available
-                        return (calculation?.availableAmount || 0) < 0.10;
+                        return (calculation?.availableAmount || 0) <= 0;
                       })()
                     }
                   >
