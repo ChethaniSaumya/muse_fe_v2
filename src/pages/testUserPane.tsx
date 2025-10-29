@@ -2547,22 +2547,6 @@ const TestUserPanel = () => {
                         Max
                       </button>
 
-                      {cumulativeData && cumulativeData.success && (
-                        <div style={{
-                          padding: '10px',
-                          background: '#f0f0f0',
-                          border: '1px solid #ccc',
-                          marginTop: '10px',
-                          fontSize: '12px'
-                        }}>
-                          <strong>Debug - Cumulative Data:</strong><br />
-                          Available: ${cumulativeData.cumulativeAvailable.toFixed(2)}<br />
-                          Total Eligible: ${cumulativeData.totalEligible.toFixed(2)}<br />
-                          Total Withdrawn: ${cumulativeData.totalWithdrawn.toFixed(2)}<br />
-                          Disbursements: {cumulativeData.totalDisbursements}
-                        </div>
-                      )}
-
                     </div>
                   </div>
 
