@@ -11,7 +11,7 @@ import { config } from './wagmi.config';
 import '@rainbow-me/rainbowkit/styles.css';
 import UserPanel from "./pages/userPanel";
 import AdminPanel from "./pages/adminPanel";
-import TestUserPanel from "./pages/testUserPane";
+import TestUserPanel from "./pages/NewDash";
 
 const queryClient = new QueryClient();
 
@@ -34,7 +34,7 @@ const App = () => {
                   <Routes>
                     <Route path="/" element={<Home />} />
                     <Route path="/my-dashboard" element={<UserPanel />} />
-                    <Route path="/test-dashboard" element={<TestUserPanel />} /> 
+                    <Route path="/test-dashboard" element={<NewDash />} /> 
                    </Routes>
                 </main>
               </div>
