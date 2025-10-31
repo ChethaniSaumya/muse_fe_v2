@@ -185,7 +185,7 @@ const NetworkSwitchModal = ({ onSwitchNetwork, onClose, isLoading }: { onSwitchN
   );
 };
 
-const UserPanel = () => {
+const NewDash = () => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -3178,4 +3178,4 @@ const validateAmount = (value: string) => {
   );
 };
 
-export default UserPanel;
+export default NewDash;
