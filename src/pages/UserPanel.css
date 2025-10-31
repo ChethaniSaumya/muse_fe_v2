@@ -620,7 +620,7 @@
   width: 100%;
   padding: 16px 24px;
   background: linear-gradient(135deg, #28a745, #20c997);
-  color: #6165B5;
+  color: #ffffff;
   border: none;
   border-radius: 12px;
   font-size: 1.1rem;
@@ -3646,7 +3646,7 @@
   gap: 6px;
   padding: 8px 16px;
   background: linear-gradient(135deg, #4f46e5, #7c3aed);
-  color: #6165B5;
+  color: #ffffff;
   border: none;
   border-radius: 6px;
   font-size: 13px;
