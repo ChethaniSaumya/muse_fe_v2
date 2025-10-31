@@ -11,7 +11,7 @@ import { config } from './wagmi.config';
 import '@rainbow-me/rainbowkit/styles.css';
 import UserPanel from "./pages/userPanel";
 import AdminPanel from "./pages/adminPanel";
-import TestUserPanel from "./pages/NewDash";
+import NewDash from "./pages/newDash";
 
 const queryClient = new QueryClient();
 
