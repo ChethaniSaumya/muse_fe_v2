@@ -4054,3 +4054,26 @@
 .tab-btn:disabled:hover {
   opacity: 0.6;
 }
+
+.header-user-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.header-user-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  color: #333;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+.header-user-name i {
+  color: #6165B5;
+  font-size: 0.9rem;
+}
