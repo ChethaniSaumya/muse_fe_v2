@@ -31,6 +31,11 @@ interface UserData {
 // Contract ABI type
 type ContractABI = readonly unknown[];
 
+const dashBoard = () => {
+  window.open("https://www.musecoinx.com/my-dashboard");
+}
+
+
 const Home = () => {
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
@@ -732,7 +737,7 @@ const Home = () => {
 
         <div className="nav-actions">
           {_connected && (
-            <button className="user-panel-btn" id="fontSize" onClick={() => window.location.href = 'my-dashboard'}>
+            <button className="user-panel-btn" id="fontSize" onClick={dashBoard}>
               <i className="fas fa-user"></i> My Dashboard
             </button>
           )}
