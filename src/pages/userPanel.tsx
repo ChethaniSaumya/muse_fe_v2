@@ -1763,32 +1763,39 @@ const UserPanel = () => {
     return (
       <div className="user-panel-container">
         <header className="user-panel-header">
-          <div className="user-panel-title">
-            <h1 onClick={website}>My Dashboard</h1>
-          </div>
+  <div className="user-panel-title">
+    <h1 onClick={website}>My Dashboard</h1>
+  </div>
 
-          <ConnectButton.Custom>
-            {({ openConnectModal, account }) => {
-              const connected = !!account;
+  <div className="header-user-info">
+    {userData?.name && (
+      <span className="header-user-name">
+        <i className="fas fa-user"></i> {userData.name}
+      </span>
+    )}
+    <ConnectButton.Custom>
+      {({ openConnectModal, account }) => {
+        const connected = !!account;
 
-              return connected ? (
-                <button
-                  className="connect-wallet-btn"
-                  onClick={disconnectWallet}
-                >
-                  <i className="fas fa-wallet"></i> {shortenAddress(account.address)}
-                </button>
-              ) : (
-                <button
-                  className="connect-wallet-btn"
-                  onClick={openConnectModal}
-                >
-                  <i className="fas fa-wallet"></i> Connect Wallet
-                </button>
-              );
-            }}
-          </ConnectButton.Custom>
-        </header>
+        return connected ? (
+          <button
+            className="connect-wallet-btn"
+            onClick={disconnectWallet}
+          >
+            <i className="fas fa-wallet"></i> {shortenAddress(account.address)}
+          </button>
+        ) : (
+          <button
+            className="connect-wallet-btn"
+            onClick={openConnectModal}
+          >
+            <i className="fas fa-wallet"></i> Connect Wallet
+          </button>
+        );
+      }}
+    </ConnectButton.Custom>
+  </div>
+</header>
         <div className="user-panel-content">
           <div className="empty-state">
             <i className="fas fa-wallet"></i>
@@ -1804,32 +1811,39 @@ const UserPanel = () => {
     return (
       <div className="user-panel-container">
         <header className="user-panel-header">
-          <div className="user-panel-title">
-            <h1 onClick={website}>My Dashboard</h1>
-          </div>
+  <div className="user-panel-title">
+    <h1 onClick={website}>My Dashboard</h1>
+  </div>
 
-          <ConnectButton.Custom>
-            {({ openConnectModal, account }) => {
-              const connected = !!account;
+  <div className="header-user-info">
+    {userData?.name && (
+      <span className="header-user-name">
+        <i className="fas fa-user"></i> {userData.name}
+      </span>
+    )}
+    <ConnectButton.Custom>
+      {({ openConnectModal, account }) => {
+        const connected = !!account;
 
-              return connected ? (
-                <button
-                  className="connect-wallet-btn"
-                  onClick={disconnectWallet}
-                >
-                  <i className="fas fa-wallet"></i> {shortenAddress(account.address)}
-                </button>
-              ) : (
-                <button
-                  className="connect-wallet-btn"
-                  onClick={openConnectModal}
-                >
-                  <i className="fas fa-wallet"></i> Connect Wallet
-                </button>
-              );
-            }}
-          </ConnectButton.Custom>
-        </header>
+        return connected ? (
+          <button
+            className="connect-wallet-btn"
+            onClick={disconnectWallet}
+          >
+            <i className="fas fa-wallet"></i> {shortenAddress(account.address)}
+          </button>
+        ) : (
+          <button
+            className="connect-wallet-btn"
+            onClick={openConnectModal}
+          >
+            <i className="fas fa-wallet"></i> Connect Wallet
+          </button>
+        );
+      }}
+    </ConnectButton.Custom>
+  </div>
+</header>
         <div className="user-panel-content">
           <div className="loading-spinner">
             <i className="fas fa-spinner fa-spin" style={{ fontSize: '2rem', color: '#6165B5' }}></i>
@@ -1842,33 +1856,40 @@ const UserPanel = () => {
   if (error) {
     return (
       <div className="user-panel-container">
-        <header className="user-panel-header">
-          <div className="user-panel-title">
-            <h1 onClick={website}>My Dashboard</h1>
-          </div>
+<header className="user-panel-header">
+  <div className="user-panel-title">
+    <h1 onClick={website}>My Dashboard</h1>
+  </div>
 
-          <ConnectButton.Custom>
-            {({ openConnectModal, account }) => {
-              const connected = !!account;
+  <div className="header-user-info">
+    {userData?.name && (
+      <span className="header-user-name">
+        <i className="fas fa-user"></i> {userData.name}
+      </span>
+    )}
+    <ConnectButton.Custom>
+      {({ openConnectModal, account }) => {
+        const connected = !!account;
 
-              return connected ? (
-                <button
-                  className="connect-wallet-btn"
-                  onClick={disconnectWallet}
-                >
-                  <i className="fas fa-wallet"></i> {shortenAddress(account.address)}
-                </button>
-              ) : (
-                <button
-                  className="connect-wallet-btn"
-                  onClick={openConnectModal}
-                >
-                  <i className="fas fa-wallet"></i> Connect Wallet
-                </button>
-              );
-            }}
-          </ConnectButton.Custom>
-        </header>
+        return connected ? (
+          <button
+            className="connect-wallet-btn"
+            onClick={disconnectWallet}
+          >
+            <i className="fas fa-wallet"></i> {shortenAddress(account.address)}
+          </button>
+        ) : (
+          <button
+            className="connect-wallet-btn"
+            onClick={openConnectModal}
+          >
+            <i className="fas fa-wallet"></i> Connect Wallet
+          </button>
+        );
+      }}
+    </ConnectButton.Custom>
+  </div>
+</header>
         <div className="user-panel-content">
           <div className="empty-state">
             <i className="fas fa-exclamation-triangle"></i>
@@ -1886,32 +1907,39 @@ const UserPanel = () => {
   return (
     <div className="user-panel-container">
       <header className="user-panel-header">
-        <div className="user-panel-title">
-          <h1 onClick={website}>My Dashboard</h1>
-        </div>
+  <div className="user-panel-title">
+    <h1 onClick={website}>My Dashboard</h1>
+  </div>
 
-        <ConnectButton.Custom>
-          {({ openConnectModal, account }) => {
-            const connected = !!account;
+  <div className="header-user-info">
+    {userData?.name && (
+      <span className="header-user-name">
+        <i className="fas fa-user"></i> {userData.name}
+      </span>
+    )}
+    <ConnectButton.Custom>
+      {({ openConnectModal, account }) => {
+        const connected = !!account;
 
-            return connected ? (
-              <button
-                className="connect-wallet-btn"
-                onClick={disconnectWallet}
-              >
-                <i className="fas fa-wallet"></i> {shortenAddress(account.address)}
-              </button>
-            ) : (
-              <button
-                className="connect-wallet-btn"
-                onClick={openConnectModal}
-              >
-                <i className="fas fa-wallet"></i> Connect Wallet
-              </button>
-            );
-          }}
-        </ConnectButton.Custom>
-      </header>
+        return connected ? (
+          <button
+            className="connect-wallet-btn"
+            onClick={disconnectWallet}
+          >
+            <i className="fas fa-wallet"></i> {shortenAddress(account.address)}
+          </button>
+        ) : (
+          <button
+            className="connect-wallet-btn"
+            onClick={openConnectModal}
+          >
+            <i className="fas fa-wallet"></i> Connect Wallet
+          </button>
+        );
+      }}
+    </ConnectButton.Custom>
+  </div>
+</header>
 
       <div className="user-panel-content">
         <div className="user-dashboard">
@@ -3137,3 +3165,4 @@ const UserPanel = () => {
 };
 
 export default UserPanel;
+
