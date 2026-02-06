@@ -684,170 +684,156 @@ const UserPanel = () => {
     }
   };
 
-  // FIXED: handleWithdrawPayout function - Replace your existing one with this
+
   const handleWithdrawPayout = async () => {
-    try {
-      setAmountError(null);
-
-      if (!withdrawalAmount || withdrawalAmount === '') {
-        setPaypalUpdateMessage({
-          text: 'Please enter a withdrawal amount',
-          type: 'error'
-        });
-        return;
-      }
-
-      const requestedAmount = parseFloat(withdrawalAmount);
-
-      if (isNaN(requestedAmount) || requestedAmount <= 0) {
-        setPaypalUpdateMessage({
-          text: 'Please enter a valid amount',
-          type: 'error'
-        });
-        return;
-      }
-
-      const currentTotalSupply = Number(totalSupplyFromContract) || Number(totalSupply) || 1;
-      const calculation = calculateDynamicPayout(
-        userData?.totalMinted || 0,
-        currentTotalSupply,
-        disposalAmount || 0,
-        totalWithdrawn || 0
-      );
-
-      const availableAmount = calculation?.availableAmount || 0;
-
-      // Use cumulative data if available (more accurate)
-      const availableForWithdrawal = cumulativeData?.cumulativeAvailable || availableAmount;
-
-      // ✅ FIXED: Removed minimum withdrawal check - allow any amount >= $0.01
-      if (requestedAmount < 0.01) {
-        setPaypalUpdateMessage({
-          text: 'Minimum withdrawal amount is $0.01',
-          type: 'error'
-        });
-        return;
-      }
-
-      if (requestedAmount > availableForWithdrawal) {
-        setPaypalUpdateMessage({
-          text: `Amount exceeds available balance of $${availableForWithdrawal.toFixed(2)}`,
-          type: 'error'
-        });
-        return;
-      }
-
-      if (!paypalEmail) {
-        setPaypalUpdateMessage({
-          text: 'Please set your PayPal email first',
-          type: 'error'
-        });
-        return;
-      }
-
-      if (!identityDocument?.verified) {
-        setPaypalUpdateMessage({
-          text: 'Identity verification required before withdrawals',
-          type: 'error'
-        });
-        return;
-      }
-
-      if (!taxIdDocument?.verified) {
-        setPaypalUpdateMessage({
-          text: 'Tax ID verification required before withdrawals',
-          type: 'error'
-        });
-        return;
-      }
-
-      if (hasWithdrawnToday) {
-        setPaypalUpdateMessage({
-          text: 'You have already withdrawn today. Please try again tomorrow.',
-          type: 'error'
-        });
-        return;
-      }
-
-      if (hasPendingPayout) {
-        setPaypalUpdateMessage({
-          text: 'You have a pending payout. Please wait for it to complete.',
-          type: 'error'
-        });
-        return;
-      }
-
-      setIsRequestingPayout(true);
+  try {
+    setAmountError(null);
+    
+    if (!withdrawalAmount || withdrawalAmount === '') {
       setPaypalUpdateMessage({
-        text: `Processing withdrawal of $${requestedAmount.toFixed(2)}...`,
-        type: 'info'
-      });
-
-      const response = await fetch(`${API_BASE_URL}/api/paypal/${walletAddress}/request-payout`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          amount: requestedAmount
-        })
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        if (data.success === true && data.status === 'completed') {
-          setPaypalUpdateMessage({
-            text: `🎉 Success! $${data.amount.toFixed(2)} has been sent to your PayPal. ${data.remainingBalance > 0 ? `Remaining balance: $${data.remainingBalance.toFixed(2)}` : ''}`,
-            type: 'success'
-          });
-        } else {
-          setPaypalUpdateMessage({
-            text: `⏳ Withdrawal request of $${data.amount.toFixed(2)} has been submitted and is being processed. You will be notified once completed.`,
-            type: 'info'
-          });
-        }
-
-        setWithdrawalAmount('');
-
-        await fetchCumulativeBalance();
-        await fetchPayPalData();
-        await fetchUserData();
-        await fetchCurrentDisposalAmount();
-
-        if (paypalData?.payouts) {
-          const pending = paypalData.payouts.find((p: Payout) =>
-            p.status === 'pending' ||
-            p.status === 'processing' ||
-            p.paypalStatus === 'PENDING'
-          );
-          setHasPendingPayout(!!pending);
-        }
-
-      } else {
-        let errorMessage = data.error || 'Failed to process withdrawal. Please try again.';
-
-        if (data.failureReason) {
-          errorMessage = `Withdrawal failed: ${data.failureReason}`;
-        } else if (data.paypalStatus === 'DENIED') {
-          errorMessage = 'Withdrawal was denied by PayPal. Please check your PayPal account status.';
-        }
-
-        setPaypalUpdateMessage({
-          text: errorMessage,
-          type: 'error'
-        });
-      }
-    } catch (error) {
-      console.error('Error processing withdrawal:', error);
-      setPaypalUpdateMessage({
-        text: 'Network error. Please check your connection and try again.',
+        text: 'Please enter a withdrawal amount',
         type: 'error'
       });
-    } finally {
-      setIsRequestingPayout(false);
+      return;
     }
-  };
+    
+    const requestedAmount = parseFloat(withdrawalAmount);
+    
+    if (isNaN(requestedAmount) || requestedAmount <= 0) {
+      setPaypalUpdateMessage({
+        text: 'Please enter a valid amount',
+        type: 'error'
+      });
+      return;
+    }
+    
+    const currentTotalSupply = Number(totalSupplyFromContract) || Number(totalSupply) || 1;
+    const calculation = calculateDynamicPayout(
+      userData?.totalMinted || 0,
+      currentTotalSupply,
+      disposalAmount || 0,
+      totalWithdrawn || 0
+    );
+    
+    const availableAmount = calculation?.availableAmount || 0;
+    
+    // Use cumulative data if available (more accurate)
+    const availableForWithdrawal = cumulativeData?.cumulativeAvailable || availableAmount;
+    
+    if (requestedAmount < 0.01) {
+      setPaypalUpdateMessage({
+        text: 'Minimum withdrawal amount is $0.01',
+        type: 'error'
+      });
+      return;
+    }
+    
+    if (requestedAmount > availableForWithdrawal) {
+      setPaypalUpdateMessage({
+        text: `Amount exceeds available balance of $${availableForWithdrawal.toFixed(2)}`,
+        type: 'error'
+      });
+      return;
+    }
+    
+    if (!paypalEmail) {
+      setPaypalUpdateMessage({
+        text: 'Please set your PayPal email first',
+        type: 'error'
+      });
+      return;
+    }
+    
+    if (!identityDocument?.verified) {
+      setPaypalUpdateMessage({
+        text: 'Identity verification required before withdrawals',
+        type: 'error'
+      });
+      return;
+    }
+    
+    if (!taxIdDocument?.verified) {
+      setPaypalUpdateMessage({
+        text: 'Tax ID verification required before withdrawals',
+        type: 'error'
+      });
+      return;
+    }
+    
+    if (hasWithdrawnToday) {
+      setPaypalUpdateMessage({
+        text: 'You have already withdrawn today. Please try again tomorrow.',
+        type: 'error'
+      });
+      return;
+    }
+    
+    if (hasPendingPayout) {
+      setPaypalUpdateMessage({
+        text: 'You have a pending payout. Please wait for it to complete.',
+        type: 'error'
+      });
+      return;
+    }
+    
+    setIsRequestingPayout(true);
+    setPaypalUpdateMessage({
+      text: `Processing withdrawal of $${requestedAmount.toFixed(2)}...`,
+      type: 'info'
+    });
+    
+    const response = await fetch(`${API_BASE_URL}/api/paypal/${walletAddress}/request-payout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        amount: requestedAmount
+      })
+    });
+    
+    const data = await response.json();
+    
+    // ✅ SIMPLIFIED MESSAGE - regardless of status
+    if (response.ok) {
+      setPaypalUpdateMessage({
+        text: 'Claim Request Sent',
+        type: 'success'
+      });
+      
+      setWithdrawalAmount('');
+      
+      await fetchCumulativeBalance();
+      await fetchPayPalData();
+      await fetchUserData();
+      await fetchCurrentDisposalAmount();
+      
+      if (paypalData?.payouts) {
+        const pending = paypalData.payouts.find((p: Payout) =>
+          p.status === 'pending' ||
+          p.status === 'processing' ||
+          p.paypalStatus === 'PENDING'
+        );
+        setHasPendingPayout(!!pending);
+      }
+      
+    } else {
+      setPaypalUpdateMessage({
+        text: 'Claim Request Sent',
+        type: 'success'
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error processing withdrawal:', error);
+    setPaypalUpdateMessage({
+      text: 'Network error. Please check your connection and try again.',
+      type: 'error'
+    });
+  } finally {
+    setIsRequestingPayout(false);
+  }
+};
 
   // ✅ FIXED: validateAmount function - Replace your existing one with this
   const validateAmount = (value: string) => {
