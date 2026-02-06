@@ -1834,7 +1834,7 @@ const UserPanel = () => {
       <div className="user-panel-container">
         <header className="user-panel-header">
           <div className="user-panel-title">
-            <h1 onClick={website}>My Dashboard</h1>
+            <h1 onClick={website}>My Test Dashboard</h1>
           </div>
 
           <div className="header-user-info">
@@ -1930,7 +1930,7 @@ const UserPanel = () => {
     <div className="user-panel-container">
       <header className="user-panel-header">
         <div className="user-panel-title">
-          <h1 onClick={website}>My Dashboard</h1>
+          <h1 onClick={website}>My Test Dashboard</h1>
         </div>
 
         <div className="header-user-info">
