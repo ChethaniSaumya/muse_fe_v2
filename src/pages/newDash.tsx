@@ -259,7 +259,7 @@ const UserPanel = () => {
   const [withdrawalAmount, setWithdrawalAmount] = useState('');
   const [amountError, setAmountError] = useState<string | null>(null);
 
-  const API_BASE_URL = 'http://localhost:3001';
+  const API_BASE_URL = 'https://muse-be.onrender.com';
   // API_BASE_URL = 'https://muse-be.onrender.com-';
 
   const { address: walletAddress, isConnected } = useAccount();
@@ -1834,7 +1834,7 @@ const UserPanel = () => {
       <div className="user-panel-container">
         <header className="user-panel-header">
           <div className="user-panel-title">
-            <h1 onClick={website}>My Test Dashboard</h1>
+            <h1 onClick={website}>My Dashboard</h1>
           </div>
 
           <div className="header-user-info">
@@ -1930,7 +1930,7 @@ const UserPanel = () => {
     <div className="user-panel-container">
       <header className="user-panel-header">
         <div className="user-panel-title">
-          <h1 onClick={website}>My Test Dashboard</h1>
+          <h1 onClick={website}>My Dashboard</h1>
         </div>
 
         <div className="header-user-info">
