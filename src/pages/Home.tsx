@@ -1844,8 +1844,10 @@ const Home = () => {
             <button
               className="mint-btn"
               onClick={mintNFT}
-              disabled={isMintDisabled}
+              /*disabled={isMintDisabled} before disable the button*/
+               disabled={true}
             >
+ 
               {isMinting || isConfirming ? 'Minting...' : 'Mint Your KK Hope NFT'}
             </button>
           )}
