@@ -319,10 +319,10 @@ const UserPanel = () => {
     }
   }
 
-  const publicClient = createPublicClient({
-    chain: polygon,
-    transport: http()
-  });
+ const publicClient = createPublicClient({
+  chain: polygon,
+  transport: http(import.meta.env.VITE_RPC_URL || 'https://poly.api.pocket.network'),
+});
 
   const handleRefreshPayoutStatus = async () => {
     try {
