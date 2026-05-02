@@ -34,7 +34,6 @@ interface Payout {
   requestedAt?: string;
   failureReason?: string;
   paypalStatus?: string;
-  disbursementId?: string;
 }
 
 interface PayPalData {
@@ -74,14 +73,13 @@ interface PayoutInfo {
 
 interface PayoutLimits {
   totalLimit?: number;
-  disbursementId?: string;
 }
 
 // Contract ABI type
 type ContractABI = readonly unknown[];
 
 const website = () => {
-  window.open("https://www.musecoinx.com/");
+  window.open("https://musecoinx.vercel.app/");
 }
 
 const EditNameModal = ({ currentName, onSave, onClose }: { currentName: string; onSave: (name: string) => Promise<void>; onClose: () => void }) => {
@@ -214,7 +212,6 @@ const UserPanel = () => {
   const [showDownloadSuccess, setShowDownloadSuccess] = useState(false);
   const [downloadedFileName, setDownloadedFileName] = useState('');
   const [paypalData, setPaypalData] = useState<PayPalData | null>(null);
-  const [cumulativeData, setCumulativeData] = useState<any>(null);
 
   const [identityDocument, setIdentityDocument] = useState<IdentityDocument | null>(null);
   const [isUploadingIdentity, setIsUploadingIdentity] = useState(false);
@@ -261,8 +258,7 @@ const UserPanel = () => {
   const [withdrawalAmount, setWithdrawalAmount] = useState('');
   const [amountError, setAmountError] = useState<string | null>(null);
 
-  const API_BASE_URL = 'http://localhost:3001';
-  // API_BASE_URL = 'http://localhost:3000-';
+  const API_BASE_URL = 'https://muse-be.onrender.com';
 
   const { address: walletAddress, isConnected } = useAccount();
   const chainId = useChainId();
@@ -321,7 +317,7 @@ const UserPanel = () => {
     }
   }
 
-const publicClient = createPublicClient({
+  const publicClient = createPublicClient({
   chain: polygon,
   transport: http(import.meta.env.VITE_RPC_URL || 'https://poly.api.pocket.network'),
 });
@@ -686,7 +682,6 @@ const publicClient = createPublicClient({
     }
   };
 
-
   const handleWithdrawPayout = async () => {
     try {
       setAmountError(null);
@@ -714,25 +709,32 @@ const publicClient = createPublicClient({
         userData?.totalMinted || 0,
         currentTotalSupply,
         disposalAmount || 0,
-        currentPoolWithdrawn || 0
+        totalWithdrawn || 0
       );
 
       const availableAmount = calculation?.availableAmount || 0;
+      const maxWithdrawal = availableAmount - 1.00;
 
-      // Use cumulative data if available (more accurate)
-      const availableForWithdrawal = cumulativeData?.cumulativeAvailable || availableAmount;
-
-      if (requestedAmount < 0.01) {
+      if (requestedAmount > maxWithdrawal && Math.abs(requestedAmount - maxWithdrawal) > 0.001) {
         setPaypalUpdateMessage({
-          text: 'Minimum withdrawal amount is $0.01',
+          text: `Amount exceeds maximum withdrawal of $${maxWithdrawal.toFixed(2)}`,
           type: 'error'
         });
         return;
       }
 
-      if (requestedAmount > availableForWithdrawal) {
+      if (requestedAmount < 1.00) {
         setPaypalUpdateMessage({
-          text: `Amount exceeds available balance of $${availableForWithdrawal.toFixed(2)}`,
+          text: 'Minimum withdrawal amount is $1.00',
+          type: 'error'
+        });
+        return;
+      }
+
+      const remainingBalance = Number((availableAmount - requestedAmount).toFixed(2));
+      if (remainingBalance > 0 && remainingBalance < 1.00) {
+        setPaypalUpdateMessage({
+          text: `This would leave $${remainingBalance.toFixed(2)} in your account. Please withdraw the full amount or leave at least $1.00`,
           type: 'error'
         });
         return;
@@ -796,16 +798,21 @@ const publicClient = createPublicClient({
 
       const data = await response.json();
 
-      // ✅ SIMPLIFIED MESSAGE - regardless of status
       if (response.ok) {
-        setPaypalUpdateMessage({
-          text: 'Claim Request Sent',
-          type: 'success'
-        });
+        if (data.success === true && data.status === 'completed') {
+          setPaypalUpdateMessage({
+            text: `🎉 Success! $${data.amount.toFixed(2)} has been sent to your PayPal. ${data.remainingBalance > 0 ? `Remaining balance: $${data.remainingBalance.toFixed(2)}` : ''}`,
+            type: 'success'
+          });
+        } else {
+          setPaypalUpdateMessage({
+            text: `⏳ Withdrawal request of $${data.amount.toFixed(2)} has been submitted and is being processed. You will be notified once completed.`,
+            type: 'info'
+          });
+        }
 
         setWithdrawalAmount('');
 
-        await fetchCumulativeBalance();
         await fetchPayPalData();
         await fetchUserData();
         await fetchCurrentDisposalAmount();
@@ -820,12 +827,19 @@ const publicClient = createPublicClient({
         }
 
       } else {
+        let errorMessage = data.error || 'Failed to process withdrawal. Please try again.';
+
+        if (data.failureReason) {
+          errorMessage = `Withdrawal failed: ${data.failureReason}`;
+        } else if (data.paypalStatus === 'DENIED') {
+          errorMessage = 'Withdrawal was denied by PayPal. Please check your PayPal account status.';
+        }
+
         setPaypalUpdateMessage({
-          text: 'Claim Request Sent',
-          type: 'success'
+          text: errorMessage,
+          type: 'error'
         });
       }
-
     } catch (error) {
       console.error('Error processing withdrawal:', error);
       setPaypalUpdateMessage({
@@ -837,7 +851,6 @@ const publicClient = createPublicClient({
     }
   };
 
-  // ✅ FIXED: validateAmount function - Replace your existing one with this
   const validateAmount = (value: string) => {
     const amount = parseFloat(value);
 
@@ -846,33 +859,21 @@ const publicClient = createPublicClient({
       return;
     }
 
-    // Use cumulative data if available
-    let availableAmount = 0;
+    const currentTotalSupply = Number(totalSupplyFromContract) || Number(totalSupply) || 1;
+    const calculation = calculateDynamicPayout(
+      userData?.totalMinted || 0,
+      currentTotalSupply,
+      disposalAmount || 0,
+      totalWithdrawn || 0
+    );
 
-    if (cumulativeData && cumulativeData.success) {
-      availableAmount = cumulativeData.cumulativeAvailable || 0;
-    } else {
-      const currentTotalSupply = Number(totalSupplyFromContract) || Number(totalSupply) || 1;
-      const calculation = calculateDynamicPayout(
-        userData?.totalMinted || 0,
-        currentTotalSupply,
-        disposalAmount || 0,
-        totalWithdrawn || 0
-      );
-      availableAmount = calculation?.availableAmount || 0;
-    }
+    const availableAmount = calculation?.availableAmount || 0;
+    const maxWithdrawal = Math.floor((availableAmount - 1.00) * 100) / 100;
 
-    console.log('🔍 VALIDATE AMOUNT:', {
-      inputAmount: amount,
-      availableAmount,
-      usingCumulativeData: !!(cumulativeData && cumulativeData.success)
-    });
-
-    // ✅ FIXED: Minimum is now $0.01 instead of $1
-    if (amount < 0.01) {
-      setAmountError('Minimum withdrawal amount is $0.01');
-    } else if (amount > availableAmount) {
-      setAmountError(`Amount exceeds available balance of $${availableAmount.toFixed(2)}`);
+    if (amount > maxWithdrawal + 0.01) {
+      setAmountError(`Maximum withdrawal is $${maxWithdrawal.toFixed(2)}`);
+    } else if (amount < 1.00) {
+      setAmountError('Minimum withdrawal is $1.00');
     } else {
       setAmountError(null);
     }
@@ -1304,31 +1305,6 @@ const publicClient = createPublicClient({
   };
 
   const [totalWithdrawn, setTotalWithdrawn] = useState(0);
-  const [currentPoolWithdrawn, setCurrentPoolWithdrawn] = useState(0);
-
-  const fetchCumulativeBalance = async () => {
-    try {
-      if (!walletAddress) return;
-
-      console.log('📊 Fetching cumulative balance for:', walletAddress);
-
-      const response = await fetch(
-        `${API_BASE_URL}/api/paypal/${walletAddress}/cumulative-breakdown`
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ Cumulative data received:', data);
-        setCumulativeData(data);
-      } else {
-        console.error('Failed to fetch cumulative data');
-        setCumulativeData(null);
-      }
-    } catch (error) {
-      console.error('Error fetching cumulative balance:', error);
-      setCumulativeData(null);
-    }
-  };
 
   useEffect(() => {
     if (walletAddress) {
@@ -1337,7 +1313,6 @@ const publicClient = createPublicClient({
       fetchIdentityStatus();
       fetchTaxIdStatus();
       fetchCurrentDisposalAmount();
-      fetchCumulativeBalance();
     }
   }, [walletAddress]);
 
@@ -1437,7 +1412,7 @@ const publicClient = createPublicClient({
 
         const successfulPayouts = data.payouts || [];
         const totalWithdrawnAmount = successfulPayouts
-          .filter((payout: Payout) => payout.status === 'success')  // Only 'success' now
+          .filter((payout: Payout) => payout.status === 'completed' || payout.status === 'success')
           .reduce((total: number, payout: Payout) => total + (payout.amount || 0), 0);
 
         console.log('🔍 DEBUG totalWithdrawn calculation:', {
@@ -1463,15 +1438,6 @@ const publicClient = createPublicClient({
 
         setTotalWithdrawn(totalWithdrawnAmount);
         console.log('✅ Total withdrawn amount:', totalWithdrawnAmount);
-
-        // Calculate withdrawn from CURRENT pool for dashboard display
-        const currentId = payoutLimits?.disbursementId;
-        const currentPoolAmount = successfulPayouts
-          .filter((payout: Payout) => payout.status === 'success' && payout.disbursementId === currentId)
-          .reduce((total: number, payout: Payout) => total + (payout.amount || 0), 0);
-        
-        setCurrentPoolWithdrawn(currentPoolAmount);
-        console.log('✅ Current pool withdrawn amount:', currentPoolAmount);
 
         const pendingPayouts = successfulPayouts.filter((payout: Payout) =>
           payout.status === 'pending' ||
@@ -1797,39 +1763,39 @@ const publicClient = createPublicClient({
     return (
       <div className="user-panel-container">
         <header className="user-panel-header">
-          <div className="user-panel-title">
-            <h1 onClick={website}>My Dashboard |</h1>
-          </div>
+  <div className="user-panel-title">
+    <h1 onClick={website}>My Dashboard</h1>
+  </div>
 
-          <div className="header-user-info">
-            {userData?.name && userData.name !== 'Anonymous' && (
-              <span className="header-user-name">
-                <i className="fas fa-user"></i> {userData.name}
-              </span>
-            )}
-            <ConnectButton.Custom>
-              {({ openConnectModal, account }) => {
-                const connected = !!account;
+  <div className="header-user-info">
+    {userData?.name && (
+      <span className="header-user-name">
+        <i className="fas fa-user"></i> {userData.name}
+      </span>
+    )}
+    <ConnectButton.Custom>
+      {({ openConnectModal, account }) => {
+        const connected = !!account;
 
-                return connected ? (
-                  <button
-                    className="connect-wallet-btn"
-                    onClick={disconnectWallet}
-                  >
-                    <i className="fas fa-wallet"></i> {shortenAddress(account.address)}
-                  </button>
-                ) : (
-                  <button
-                    className="connect-wallet-btn"
-                    onClick={openConnectModal}
-                  >
-                    <i className="fas fa-wallet"></i> Connect Wallet
-                  </button>
-                );
-              }}
-            </ConnectButton.Custom>
-          </div>
-        </header>
+        return connected ? (
+          <button
+            className="connect-wallet-btn"
+            onClick={disconnectWallet}
+          >
+            <i className="fas fa-wallet"></i> {shortenAddress(account.address)}
+          </button>
+        ) : (
+          <button
+            className="connect-wallet-btn"
+            onClick={openConnectModal}
+          >
+            <i className="fas fa-wallet"></i> Connect Wallet
+          </button>
+        );
+      }}
+    </ConnectButton.Custom>
+  </div>
+</header>
         <div className="user-panel-content">
           <div className="empty-state">
             <i className="fas fa-wallet"></i>
@@ -1845,39 +1811,39 @@ const publicClient = createPublicClient({
     return (
       <div className="user-panel-container">
         <header className="user-panel-header">
-          <div className="user-panel-title">
-            <h1 onClick={website}>My Dashboard | |</h1>
-          </div>
+  <div className="user-panel-title">
+    <h1 onClick={website}>My Dashboard</h1>
+  </div>
 
-          <div className="header-user-info">
-            {userData?.name && (
-              <span className="header-user-name">
-                <i className="fas fa-user"></i> {userData.name}
-              </span>
-            )}
-            <ConnectButton.Custom>
-              {({ openConnectModal, account }) => {
-                const connected = !!account;
+  <div className="header-user-info">
+    {userData?.name && (
+      <span className="header-user-name">
+        <i className="fas fa-user"></i> {userData.name}
+      </span>
+    )}
+    <ConnectButton.Custom>
+      {({ openConnectModal, account }) => {
+        const connected = !!account;
 
-                return connected ? (
-                  <button
-                    className="connect-wallet-btn"
-                    onClick={disconnectWallet}
-                  >
-                    <i className="fas fa-wallet"></i> {shortenAddress(account.address)}
-                  </button>
-                ) : (
-                  <button
-                    className="connect-wallet-btn"
-                    onClick={openConnectModal}
-                  >
-                    <i className="fas fa-wallet"></i> Connect Wallet
-                  </button>
-                );
-              }}
-            </ConnectButton.Custom>
-          </div>
-        </header>
+        return connected ? (
+          <button
+            className="connect-wallet-btn"
+            onClick={disconnectWallet}
+          >
+            <i className="fas fa-wallet"></i> {shortenAddress(account.address)}
+          </button>
+        ) : (
+          <button
+            className="connect-wallet-btn"
+            onClick={openConnectModal}
+          >
+            <i className="fas fa-wallet"></i> Connect Wallet
+          </button>
+        );
+      }}
+    </ConnectButton.Custom>
+  </div>
+</header>
         <div className="user-panel-content">
           <div className="loading-spinner">
             <i className="fas fa-spinner fa-spin" style={{ fontSize: '2rem', color: '#6165B5' }}></i>
@@ -1890,40 +1856,40 @@ const publicClient = createPublicClient({
   if (error) {
     return (
       <div className="user-panel-container">
-        <header className="user-panel-header">
-          <div className="user-panel-title">
-            <h1 onClick={website}>My Dashboard |</h1>
-          </div>
+<header className="user-panel-header">
+  <div className="user-panel-title">
+    <h1 onClick={website}>My Dashboard</h1>
+  </div>
 
-          <div className="header-user-info">
-            {userData?.name && (
-              <span className="header-user-name">
-                <i className="fas fa-user"></i> {userData.name}
-              </span>
-            )}
-            <ConnectButton.Custom>
-              {({ openConnectModal, account }) => {
-                const connected = !!account;
+  <div className="header-user-info">
+    {userData?.name && (
+      <span className="header-user-name">
+        <i className="fas fa-user"></i> {userData.name}
+      </span>
+    )}
+    <ConnectButton.Custom>
+      {({ openConnectModal, account }) => {
+        const connected = !!account;
 
-                return connected ? (
-                  <button
-                    className="connect-wallet-btn"
-                    onClick={disconnectWallet}
-                  >
-                    <i className="fas fa-wallet"></i> {shortenAddress(account.address)}
-                  </button>
-                ) : (
-                  <button
-                    className="connect-wallet-btn"
-                    onClick={openConnectModal}
-                  >
-                    <i className="fas fa-wallet"></i> Connect Wallet
-                  </button>
-                );
-              }}
-            </ConnectButton.Custom>
-          </div>
-        </header>
+        return connected ? (
+          <button
+            className="connect-wallet-btn"
+            onClick={disconnectWallet}
+          >
+            <i className="fas fa-wallet"></i> {shortenAddress(account.address)}
+          </button>
+        ) : (
+          <button
+            className="connect-wallet-btn"
+            onClick={openConnectModal}
+          >
+            <i className="fas fa-wallet"></i> Connect Wallet
+          </button>
+        );
+      }}
+    </ConnectButton.Custom>
+  </div>
+</header>
         <div className="user-panel-content">
           <div className="empty-state">
             <i className="fas fa-exclamation-triangle"></i>
@@ -1941,39 +1907,39 @@ const publicClient = createPublicClient({
   return (
     <div className="user-panel-container">
       <header className="user-panel-header">
-        <div className="user-panel-title">
-          <h1 onClick={website}>My Dashboard |</h1>
-        </div>
+  <div className="user-panel-title">
+    <h1 onClick={website}>My Dashboard</h1>
+  </div>
 
-        <div className="header-user-info">
-          {userData?.name && (
-            <span className="header-user-name">
-              <i className="fas fa-user"></i> {userData.name}
-            </span>
-          )}
-          <ConnectButton.Custom>
-            {({ openConnectModal, account }) => {
-              const connected = !!account;
+  <div className="header-user-info">
+    {userData?.name && (
+      <span className="header-user-name">
+        <i className="fas fa-user"></i> {userData.name}
+      </span>
+    )}
+    <ConnectButton.Custom>
+      {({ openConnectModal, account }) => {
+        const connected = !!account;
 
-              return connected ? (
-                <button
-                  className="connect-wallet-btn"
-                  onClick={disconnectWallet}
-                >
-                  <i className="fas fa-wallet"></i> {shortenAddress(account.address)}
-                </button>
-              ) : (
-                <button
-                  className="connect-wallet-btn"
-                  onClick={openConnectModal}
-                >
-                  <i className="fas fa-wallet"></i> Connect Wallet
-                </button>
-              );
-            }}
-          </ConnectButton.Custom>
-        </div>
-      </header>
+        return connected ? (
+          <button
+            className="connect-wallet-btn"
+            onClick={disconnectWallet}
+          >
+            <i className="fas fa-wallet"></i> {shortenAddress(account.address)}
+          </button>
+        ) : (
+          <button
+            className="connect-wallet-btn"
+            onClick={openConnectModal}
+          >
+            <i className="fas fa-wallet"></i> Connect Wallet
+          </button>
+        );
+      }}
+    </ConnectButton.Custom>
+  </div>
+</header>
 
       <div className="user-panel-content">
         <div className="user-dashboard">
@@ -2003,29 +1969,7 @@ const publicClient = createPublicClient({
               <div className="stat-item">
                 <span className="stat-label">Equivalent in USD:</span>
                 <span className="stat-value">
-                  ${(() => {
-                    try {
-                      // Use cumulative data from backend
-                      if (cumulativeData && cumulativeData.success) {
-                        return cumulativeData.cumulativeAvailable.toFixed(2);
-                      }
-                      // Fallback
-                      if (!disposalAmount || disposalAmount <= 0) {
-                        return '0.00';
-                      }
-                      const currentTotalSupply = Number(totalSupplyFromContract) || Number(totalSupply) || 1;
-                      const calculation = calculateDynamicPayout(
-                        userData?.totalMinted || 0,
-                        currentTotalSupply,
-                        disposalAmount || 0,
-                        currentPoolWithdrawn || 0
-                      );
-                      return (calculation?.availableAmount || 0).toFixed(2);
-                    } catch (error) {
-                      console.error('Error displaying USD equivalent:', error);
-                      return '0.00';
-                    }
-                  })()}
+                  $0
                 </span>
               </div>
               <div className="stat-item">
@@ -2382,14 +2326,9 @@ const publicClient = createPublicClient({
                             </div>
                           </div>
                           <div className="table-cell" >{userData?.totalMinted || 0}</div>
-                          <div className="table-cell balance-amount">
+                          <div className="table-cell balance-amount" >
                             ${(() => {
                               try {
-                                // Use cumulative data from backend
-                                if (cumulativeData && cumulativeData.success) {
-                                  return cumulativeData.cumulativeAvailable.toFixed(2);
-                                }
-                                // Fallback to old calculation if cumulative data not loaded yet
                                 const currentTotalSupply = Number(totalSupplyFromContract) || Number(totalSupply) || 1;
                                 const calculation = calculateDynamicPayout(
                                   userData?.totalMinted || 0,
@@ -2399,7 +2338,7 @@ const publicClient = createPublicClient({
                                 );
                                 return (calculation?.availableAmount || 0).toFixed(2);
                               } catch (error) {
-                                console.error('Error displaying balance:', error);
+                                console.error('Error calculating payout amount:', error);
                                 return '0.00';
                               }
                             })()}
@@ -2480,17 +2419,22 @@ const publicClient = createPublicClient({
                         id="withdrawalAmount"
                         type="number"
                         step="0.01"
-                        min="0.10"
+                        min="1.00"
+                        max={(() => {
+                          const calculation = calculateDynamicPayout(
+                            userData?.totalMinted || 0,
+                            Number(totalSupplyFromContract) || Number(totalSupply) || 1,
+                            disposalAmount || 0,
+                            totalWithdrawn || 0
+                          );
+                          const availableAmount = calculation?.availableAmount || 0;
+                          return Math.max(0, availableAmount - 1.00);
+                        })()}
                         placeholder="0.00"
                         value={withdrawalAmount}
                         onChange={(e) => {
-                          const newValue = e.target.value;
-                          setWithdrawalAmount(newValue);
-                          if (newValue) {
-                            validateAmount(newValue);
-                          } else {
-                            setAmountError(null);
-                          }
+                          setWithdrawalAmount(e.target.value);
+                          validateAmount(e.target.value);
                           if (paypalUpdateMessage && (paypalUpdateMessage.type === 'error' || paypalUpdateMessage.type === 'warning')) {
                             setPaypalUpdateMessage(null);
                           }
@@ -2503,9 +2447,21 @@ const publicClient = createPublicClient({
                         className="amount-input"
                         disabled={
                           !paypalEmail ||
+                          !userData?.totalMinted ||
+                          isRequestingPayout ||
+                          hasWithdrawnToday ||
                           !identityDocument?.verified ||
                           !taxIdDocument?.verified ||
-                          isRequestingPayout
+                          hasPendingPayout ||
+                          (() => {
+                            const calc = calculateDynamicPayout(
+                              userData?.totalMinted || 0,
+                              Number(totalSupplyFromContract) || Number(totalSupply) || 1,
+                              disposalAmount || 0,
+                              totalWithdrawn || 0
+                            );
+                            return (calc?.availableAmount || 0) < 2.00;
+                          })()
                         }
                       />
                     </div>
@@ -2515,17 +2471,16 @@ const publicClient = createPublicClient({
                       </div>
                     )}
                     <div className="amount-limits">
-                      <span>Available: ${(() => {
-                        if (cumulativeData && cumulativeData.success) {
-                          return cumulativeData.cumulativeAvailable.toFixed(2);
-                        }
+                      <span>Minimum: $1.00</span>
+                      <span>Maximum: ${(() => {
                         const calc = calculateDynamicPayout(
                           userData?.totalMinted || 0,
                           Number(totalSupplyFromContract) || Number(totalSupply) || 1,
                           disposalAmount || 0,
-                          currentPoolWithdrawn || 0
+                          totalWithdrawn || 0
                         );
-                        return (calc?.availableAmount || 0).toFixed(2);
+                        const availableAmount = calc?.availableAmount || 0;
+                        return Math.max(0, availableAmount - 1.00).toFixed(2);
                       })()}</span>
                     </div>
                   </div>
@@ -2536,41 +2491,39 @@ const publicClient = createPublicClient({
                       <button
                         className="quick-amount-btn"
                         onClick={() => {
-                          // Use cumulative data
-                          let maxAmount = 0;
+                          const calc = calculateDynamicPayout(
+                            userData?.totalMinted || 0,
+                            Number(totalSupplyFromContract) || Number(totalSupply) || 1,
+                            disposalAmount || 0,
+                            totalWithdrawn || 0
+                          );
+                          const availableAmount = calc?.availableAmount || 0;
+                          const maxWithdrawAmount = availableAmount - 1.00;
 
-                          if (cumulativeData && cumulativeData.success) {
-                            maxAmount = cumulativeData.cumulativeAvailable || 0;
-                          } else {
-                            // Fallback to old calculation
+                          console.log('🔍 DEBUG Max button:', {
+                            availableAmount,
+                            maxWithdrawAmount,
+                            setting: maxWithdrawAmount.toFixed(2)
+                          });
+
+                          setWithdrawalAmount(maxWithdrawAmount.toFixed(2));
+                        }}
+                        disabled={
+                          isRequestingPayout || !paypalEmail ||
+                          !identityDocument?.verified || !taxIdDocument?.verified ||
+                          (() => {
                             const calc = calculateDynamicPayout(
                               userData?.totalMinted || 0,
                               Number(totalSupplyFromContract) || Number(totalSupply) || 1,
                               disposalAmount || 0,
-                              currentPoolWithdrawn || 0
+                              totalWithdrawn || 0
                             );
-                            maxAmount = calc?.availableAmount || 0;
-                          }
-
-                          console.log('🔍 DEBUG Max button:', {
-                            maxAmount,
-                            setting: maxAmount.toFixed(2),
-                            usingCumulativeData: !!(cumulativeData && cumulativeData.success)
-                          });
-
-                          const finalAmount = maxAmount.toFixed(2);
-                          setWithdrawalAmount(finalAmount);
-                          setAmountError(null);
-                        }}
-                        disabled={
-                          isRequestingPayout ||
-                          (cumulativeData ? cumulativeData.cumulativeAvailable <= 0 :
-                            (!disposalAmount || disposalAmount <= 0))
+                            return (calc?.availableAmount || 0) < 1.00;
+                          })()
                         }
                       >
                         Max
                       </button>
-
                     </div>
                   </div>
 
@@ -2587,24 +2540,30 @@ const publicClient = createPublicClient({
                       !taxIdDocument?.verified ||
                       hasPendingPayout ||
                       !withdrawalAmount ||
-                      parseFloat(withdrawalAmount) <= 0 ||  // Only check > 0
-                      !!amountError ||
+                      parseFloat(withdrawalAmount) < 1.00 ||
                       (() => {
-                        // Check if user has any available balance
-                        if (cumulativeData && cumulativeData.success) {
-                          return cumulativeData.cumulativeAvailable <= 0;
-                        }
+                        const currentTotalSupply = Number(totalSupplyFromContract) || Number(totalSupply) || 1;
                         const calculation = calculateDynamicPayout(
                           userData?.totalMinted || 0,
-                          Number(totalSupplyFromContract) || Number(totalSupply) || 1,
+                          currentTotalSupply,
                           disposalAmount || 0,
-                          currentPoolWithdrawn || 0
+                          totalWithdrawn || 0
                         );
-                        return (calculation?.availableAmount || 0) <= 0;
+                        return (calculation?.availableAmount || 0) < 1.00;
                       })()
                     }
                   >
-                    {isRequestingPayout ? 'Processing...' : 'Send to PayPal'}
+                    {isRequestingPayout ? (
+                      <>
+                        <i className="fas fa-spinner fa-spin"></i>
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-paper-plane"></i>
+                        Send to PayPal
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -3206,3 +3165,4 @@ const publicClient = createPublicClient({
 };
 
 export default UserPanel;
+
