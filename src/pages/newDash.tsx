@@ -72,9 +72,22 @@ interface PayoutInfo {
   minimumPayout?: number;
 }
 
-interface PayoutLimits {
-  totalLimit?: number;
-  disbursementId?: string;
+interface ProjectStats {
+  projectName: string;
+  nftsOwned: number;
+  totalEligible: number;
+  totalWithdrawn: number;
+  availableBalance: number;
+  disbursementsCount: number;
+}
+
+interface CumulativeData {
+  success: boolean;
+  cumulativeAvailable: number;
+  totalEligible: number;
+  totalWithdrawn: number;
+  sharePercentage: number;
+  projectBreakdown?: Record<string, ProjectStats>;
 }
 
 // Contract ABI type
@@ -214,7 +227,8 @@ const UserPanel = () => {
   const [showDownloadSuccess, setShowDownloadSuccess] = useState(false);
   const [downloadedFileName, setDownloadedFileName] = useState('');
   const [paypalData, setPaypalData] = useState<PayPalData | null>(null);
-  const [cumulativeData, setCumulativeData] = useState<any>(null);
+  const [cumulativeData, setCumulativeData] = useState<CumulativeData | null>(null);
+  const [selectedProject, setSelectedProject] = useState<ProjectStats | null>(null);
 
   const [identityDocument, setIdentityDocument] = useState<IdentityDocument | null>(null);
   const [isUploadingIdentity, setIsUploadingIdentity] = useState(false);
@@ -790,7 +804,8 @@ const UserPanel = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          amount: requestedAmount
+          amount: requestedAmount,
+          projectName: selectedProject?.projectName
         })
       });
 
@@ -849,7 +864,9 @@ const UserPanel = () => {
     // Use cumulative data if available
     let availableAmount = 0;
 
-    if (cumulativeData && cumulativeData.success) {
+    if (selectedProject) {
+      availableAmount = selectedProject.availableBalance || 0;
+    } else if (cumulativeData && cumulativeData.success) {
       availableAmount = cumulativeData.cumulativeAvailable || 0;
     } else {
       const currentTotalSupply = Number(totalSupplyFromContract) || Number(totalSupply) || 1;
@@ -2375,50 +2392,86 @@ const UserPanel = () => {
                           <div className="header-cell">PayPal Status</div>
                           <div className="header-cell">Action</div>
                         </div>
-                        <div className="stats-table-row">
-                          <div className="table-cell"  >
-                            <div className="asset-info">
-                              <span>Hope Coin KK NFTs</span>
+                        {cumulativeData?.projectBreakdown ? (
+                          Object.values(cumulativeData.projectBreakdown).map((project, index) => (
+                            <div className="stats-table-row" key={index}>
+                              <div className="table-cell">
+                                <div className="asset-info">
+                                  <span>{project.projectName}</span>
+                                </div>
+                              </div>
+                              <div className="table-cell">{project.nftsOwned}</div>
+                              <div className="table-cell balance-amount">
+                                ${project.availableBalance.toFixed(2)}
+                              </div>
+                              <div className="table-cell">
+                                <span className={`status-badge ${paypalEmail ? 'verified' : 'pending'}`}>
+                                  {paypalEmail ? 'Connected' : 'Not Set'}
+                                </span>
+                              </div>
+                              <div className="table-cell action-cell">
+                                <button
+                                  className="table-withdraw-btn"
+                                  onClick={() => {
+                                    setSelectedProject(project);
+                                    setShowWithdrawalPopup(true);
+                                  }}
+                                  disabled={!paypalEmail || !identityDocument?.verified || !taxIdDocument?.verified || project.availableBalance <= 0}
+                                >
+                                  <i className="fas fa-money-bill-wave"></i> Withdraw
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="stats-table-row">
+                            <div className="table-cell">
+                              <div className="asset-info">
+                                <span>Hope Coin KK NFTs</span>
+                              </div>
+                            </div>
+                            <div className="table-cell">{userData?.totalMinted || 0}</div>
+                            <div className="table-cell balance-amount">
+                              ${(() => {
+                                try {
+                                  // Use cumulative data from backend
+                                  if (cumulativeData && cumulativeData.success) {
+                                    return cumulativeData.cumulativeAvailable.toFixed(2);
+                                  }
+                                  // Fallback to old calculation if cumulative data not loaded yet
+                                  const currentTotalSupply = Number(totalSupplyFromContract) || Number(totalSupply) || 1;
+                                  const calculation = calculateDynamicPayout(
+                                    userData?.totalMinted || 0,
+                                    currentTotalSupply,
+                                    disposalAmount || 0,
+                                    totalWithdrawn || 0
+                                  );
+                                  return (calculation?.availableAmount || 0).toFixed(2);
+                                } catch (error) {
+                                  console.error('Error displaying balance:', error);
+                                  return '0.00';
+                                }
+                              })()}
+                            </div>
+                            <div className="table-cell">
+                              <span className={`status-badge ${paypalEmail ? 'verified' : 'pending'}`}>
+                                {paypalEmail ? 'Connected' : 'Not Set'}
+                              </span>
+                            </div>
+                            <div className="table-cell action-cell">
+                              <button
+                                className="table-withdraw-btn"
+                                onClick={() => {
+                                  setSelectedProject(null);
+                                  setShowWithdrawalPopup(true);
+                                }}
+                                disabled={!paypalEmail || !identityDocument?.verified || !taxIdDocument?.verified}
+                              >
+                                <i className="fas fa-money-bill-wave"></i> Withdraw
+                              </button>
                             </div>
                           </div>
-                          <div className="table-cell" >{userData?.totalMinted || 0}</div>
-                          <div className="table-cell balance-amount">
-                            ${(() => {
-                              try {
-                                // Use cumulative data from backend
-                                if (cumulativeData && cumulativeData.success) {
-                                  return cumulativeData.cumulativeAvailable.toFixed(2);
-                                }
-                                // Fallback to old calculation if cumulative data not loaded yet
-                                const currentTotalSupply = Number(totalSupplyFromContract) || Number(totalSupply) || 1;
-                                const calculation = calculateDynamicPayout(
-                                  userData?.totalMinted || 0,
-                                  currentTotalSupply,
-                                  disposalAmount || 0,
-                                  totalWithdrawn || 0
-                                );
-                                return (calculation?.availableAmount || 0).toFixed(2);
-                              } catch (error) {
-                                console.error('Error displaying balance:', error);
-                                return '0.00';
-                              }
-                            })()}
-                          </div>
-                          <div className="table-cell" >
-                            <span className={`status-badge ${paypalEmail ? 'verified' : 'pending'}`}>
-                              {paypalEmail ? 'Connected' : 'Not Set'}
-                            </span>
-                          </div>
-                          <div className="table-cell action-cell" >
-                            <button
-                              className="table-withdraw-btn"
-                              onClick={() => setShowWithdrawalPopup(true)}
-                              disabled={!paypalEmail || !identityDocument?.verified || !taxIdDocument?.verified}
-                            >
-                              <i className="fas fa-money-bill-wave"></i> Withdraw
-                            </button>
-                          </div>
-                        </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2516,6 +2569,9 @@ const UserPanel = () => {
                     )}
                     <div className="amount-limits">
                       <span>Available: ${(() => {
+                        if (selectedProject) {
+                          return selectedProject.availableBalance.toFixed(2);
+                        }
                         if (cumulativeData && cumulativeData.success) {
                           return cumulativeData.cumulativeAvailable.toFixed(2);
                         }
@@ -2539,7 +2595,9 @@ const UserPanel = () => {
                           // Use cumulative data
                           let maxAmount = 0;
 
-                          if (cumulativeData && cumulativeData.success) {
+                          if (selectedProject) {
+                            maxAmount = selectedProject.availableBalance || 0;
+                          } else if (cumulativeData && cumulativeData.success) {
                             maxAmount = cumulativeData.cumulativeAvailable || 0;
                           } else {
                             // Fallback to old calculation
