@@ -34,6 +34,7 @@ interface Payout {
   requestedAt?: string;
   failureReason?: string;
   paypalStatus?: string;
+  disbursementId?: string;
 }
 
 interface PayPalData {
@@ -73,6 +74,7 @@ interface PayoutInfo {
 
 interface PayoutLimits {
   totalLimit?: number;
+  disbursementId?: string;
 }
 
 // Contract ABI type
@@ -260,7 +262,7 @@ const UserPanel = () => {
   const [amountError, setAmountError] = useState<string | null>(null);
 
   const API_BASE_URL = 'https://muse-be.onrender.com';
-  // API_BASE_URL = 'https://muse-be.onrender.com-';
+  // API_BASE_URL = 'http://localhost:3000-';
 
   const { address: walletAddress, isConnected } = useAccount();
   const chainId = useChainId();
@@ -319,10 +321,10 @@ const UserPanel = () => {
     }
   }
 
- const publicClient = createPublicClient({
-  chain: polygon,
-  transport: http(import.meta.env.VITE_RPC_URL || 'https://poly.api.pocket.network'),
-});
+  const publicClient = createPublicClient({
+    chain: polygon,
+    transport: http(import.meta.env.VITE_RPC_URL || 'https://poly.api.pocket.network'),
+  });
 
   const handleRefreshPayoutStatus = async () => {
     try {
@@ -712,7 +714,7 @@ const UserPanel = () => {
         userData?.totalMinted || 0,
         currentTotalSupply,
         disposalAmount || 0,
-        totalWithdrawn || 0
+        currentPoolWithdrawn || 0
       );
 
       const availableAmount = calculation?.availableAmount || 0;
@@ -1302,6 +1304,7 @@ const UserPanel = () => {
   };
 
   const [totalWithdrawn, setTotalWithdrawn] = useState(0);
+  const [currentPoolWithdrawn, setCurrentPoolWithdrawn] = useState(0);
 
   const fetchCumulativeBalance = async () => {
     try {
@@ -1460,6 +1463,15 @@ const UserPanel = () => {
 
         setTotalWithdrawn(totalWithdrawnAmount);
         console.log('✅ Total withdrawn amount:', totalWithdrawnAmount);
+
+        // Calculate withdrawn from CURRENT pool for dashboard display
+        const currentId = payoutLimits?.disbursementId;
+        const currentPoolAmount = successfulPayouts
+          .filter((payout: Payout) => payout.status === 'success' && payout.disbursementId === currentId)
+          .reduce((total: number, payout: Payout) => total + (payout.amount || 0), 0);
+
+        setCurrentPoolWithdrawn(currentPoolAmount);
+        console.log('✅ Current pool withdrawn amount:', currentPoolAmount);
 
         const pendingPayouts = successfulPayouts.filter((payout: Payout) =>
           payout.status === 'pending' ||
@@ -1786,7 +1798,7 @@ const UserPanel = () => {
       <div className="user-panel-container">
         <header className="user-panel-header">
           <div className="user-panel-title">
-            <h1 onClick={website}>My Dashboard</h1>
+            <h1 onClick={website}>My Dashboard |</h1>
           </div>
 
           <div className="header-user-info">
@@ -1834,7 +1846,7 @@ const UserPanel = () => {
       <div className="user-panel-container">
         <header className="user-panel-header">
           <div className="user-panel-title">
-            <h1 onClick={website}>My Dashboard</h1>
+            <h1 onClick={website}>My Dashboard | |</h1>
           </div>
 
           <div className="header-user-info">
@@ -1880,7 +1892,7 @@ const UserPanel = () => {
       <div className="user-panel-container">
         <header className="user-panel-header">
           <div className="user-panel-title">
-            <h1 onClick={website}>My Dashboard</h1>
+            <h1 onClick={website}>My Dashboard |</h1>
           </div>
 
           <div className="header-user-info">
@@ -1930,7 +1942,7 @@ const UserPanel = () => {
     <div className="user-panel-container">
       <header className="user-panel-header">
         <div className="user-panel-title">
-          <h1 onClick={website}>My Dashboard</h1>
+          <h1 onClick={website}>My Dashboard |</h1>
         </div>
 
         <div className="header-user-info">
@@ -2006,7 +2018,7 @@ const UserPanel = () => {
                         userData?.totalMinted || 0,
                         currentTotalSupply,
                         disposalAmount || 0,
-                        totalWithdrawn || 0
+                        currentPoolWithdrawn || 0
                       );
                       return (calculation?.availableAmount || 0).toFixed(2);
                     } catch (error) {
@@ -2511,7 +2523,7 @@ const UserPanel = () => {
                           userData?.totalMinted || 0,
                           Number(totalSupplyFromContract) || Number(totalSupply) || 1,
                           disposalAmount || 0,
-                          totalWithdrawn || 0
+                          currentPoolWithdrawn || 0
                         );
                         return (calc?.availableAmount || 0).toFixed(2);
                       })()}</span>
@@ -2535,7 +2547,7 @@ const UserPanel = () => {
                               userData?.totalMinted || 0,
                               Number(totalSupplyFromContract) || Number(totalSupply) || 1,
                               disposalAmount || 0,
-                              totalWithdrawn || 0
+                              currentPoolWithdrawn || 0
                             );
                             maxAmount = calc?.availableAmount || 0;
                           }
@@ -2586,7 +2598,7 @@ const UserPanel = () => {
                           userData?.totalMinted || 0,
                           Number(totalSupplyFromContract) || Number(totalSupply) || 1,
                           disposalAmount || 0,
-                          totalWithdrawn || 0
+                          currentPoolWithdrawn || 0
                         );
                         return (calculation?.availableAmount || 0) <= 0;
                       })()
